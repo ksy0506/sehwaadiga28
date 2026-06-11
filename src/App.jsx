@@ -700,6 +700,135 @@ function UnivDetail({ u, customAdms, customUnits, onDeleteAdm, onDeleteUnit, upd
   );
 }
 
+/* ══════════════ 첨단학과 탭 ══════════════ */
+
+function AdvTab({ query }) {
+  const [cat, setCat] = useState("전체");
+  const cats = ["전체", ...Array.from(new Set(ADV_DATA.map(d => d.cat)))];
+  const q = query.trim();
+  const list = ADV_DATA.filter(d =>
+    (cat === "전체" || d.cat === cat) &&
+    (!q || d.univ.includes(q) || d.unit.includes(q))
+  );
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {cats.map(c => (
+          <button key={c} onClick={() => setCat(c)}
+            className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${cat===c ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"}`}>
+            {c}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {list.map((d, i) => (
+          <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200">{d.cat}</span>
+              <span className="font-bold text-slate-800 text-sm">{d.univ}</span>
+              <span className="text-sm text-slate-500">{d.unit}</span>
+            </div>
+            <table className="mt-3 w-full text-sm">
+              <tbody>
+                {d.rows.map((r, j) => (
+                  <tr key={j} className="border-t border-slate-100">
+                    <td className="py-1.5 w-14"><TypeBadge t={r[0]} /></td>
+                    <td className="py-1.5 text-slate-700">{r[1]}</td>
+                    <td className="py-1.5 text-right font-bold tabular-nums text-slate-800 w-12">{r[2]}명</td>
+                    <td className="py-1.5 pl-3 text-xs text-slate-500 w-2/5">{r[3] ? <span className="text-rose-600">{r[3]}</span> : <span className="text-slate-300">최저 없음</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        {list.length === 0 && <p className="text-sm text-slate-400">검색 결과가 없습니다.</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════ 메디컬 탭 ══════════════ */
+
+function MedTab({ query }) {
+  const fields = Object.keys(MED_DATA);
+  const [field, setField] = useState(fields[0]);
+  const q = query.trim();
+  const rows = MED_DATA[field].filter(r => !q || r[0].includes(q) || r[2].includes(q));
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {fields.map(f => (
+          <button key={f} onClick={() => setField(f)}
+            className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${field===f ? "bg-rose-600 text-white border-rose-600" : "bg-white text-slate-600 border-slate-200 hover:border-rose-300"}`}>
+            {f}
+          </button>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
+        <table className="w-full text-sm min-w-[640px]">
+          <thead>
+            <tr className="bg-slate-50 text-slate-500 text-xs uppercase">
+              <th className="text-left px-4 py-2.5 font-bold">대학</th>
+              <th className="text-left px-2 py-2.5 font-bold">유형</th>
+              <th className="text-left px-2 py-2.5 font-bold">전형명</th>
+              <th className="text-right px-2 py-2.5 font-bold">'28 인원</th>
+              <th className="text-left px-3 py-2.5 font-bold">수능최저 (국수영탐 기준)</th>
+              <th className="text-right px-4 py-2.5 font-bold">'26 경쟁률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                <td className="px-4 py-2 font-semibold text-slate-800 whitespace-nowrap">{r[0]}</td>
+                <td className="px-2 py-2"><TypeBadge t={r[1]} /></td>
+                <td className="px-2 py-2 text-slate-700 whitespace-nowrap">{r[2]}</td>
+                <td className="px-2 py-2 text-right font-bold tabular-nums">{r[3]}</td>
+                <td className="px-3 py-2 text-xs">{r[4] ? <span className="text-rose-600">{r[4]}</span> : <span className="text-slate-300">최저 없음</span>}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-slate-500">{r[5]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <p className="p-4 text-sm text-slate-400">검색 결과가 없습니다.</p>}
+      </div>
+      <p className="text-xs text-slate-400">※ 수시 기준 발췌. 최저학력기준 표기는 약식이며(예: 3합4 = 3개 영역 등급 합 4), 정확한 조건·정시 반영은 대학별 모집요강을 확인하세요.</p>
+    </div>
+  );
+}
+
+/* ══════════════ 특목대 탭 ══════════════ */
+
+function SpecialTab({ query }) {
+  const q = query.trim();
+  const list = SPECIAL_DATA.filter(s => !q || s.name.includes(q));
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {list.map((s, i) => (
+        <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Shield size={16} className="text-indigo-500" />
+            <span className="font-extrabold text-slate-900">{s.name}</span>
+          </div>
+          {s.note && <p className="mt-1 text-xs text-indigo-600">{s.note}</p>}
+          <div className="mt-3 space-y-2">
+            {s.rows.map((r, j) => (
+              <div key={j} className="border-t border-slate-100 pt-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-800">{r[0]}</span>
+                  <span className="text-sm font-bold tabular-nums text-slate-700 shrink-0">{r[1]}명</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">{r[2]}</p>
+                {r[3] && <p className="text-xs text-rose-600 mt-0.5">최저: {r[3]}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ══════════════ 비교 탭 ══════════════ */
 
 const TYPE_ORDER = ["교과", "종합", "논술", "정시", "기타"];
