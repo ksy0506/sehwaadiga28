@@ -1391,7 +1391,7 @@ function UnivDetail({ u, customAdms, customUnits, onDeleteAdm, onDeleteUnit, upd
                         className={`inline-flex items-center gap-1 text-xs rounded-md px-2 py-1 border transition-all ${faved
                           ? "bg-amber-50 border-amber-300 ring-1 ring-amber-200"
                           : "bg-slate-50 border-slate-200 hover:border-amber-300 hover:bg-amber-50"}`}
-                        title={hasActiveStudent ? (faved ? "관심 목록에서 제거" : "관심 학생에 담기") : "관심 학생 탭에서 학생을 먼저 추가하세요"}>
+                        title={hasActiveStudent ? (faved ? "관심 목록에서 빼기" : "관심 담기") : "화면 맨 위에서 학생을 먼저 고르세요"}>
                         {hasActiveStudent && <Star size={10} className={faved ? "text-amber-400 fill-amber-400" : "text-slate-300"} />}
                         <span className="text-slate-500">{name}</span>
                         <span className="font-bold text-slate-800 tabular-nums">{num}</span>
@@ -1579,226 +1579,253 @@ function lookupAdm(allUnivs, univId, admName) {
   return u.adms.find(a => a.n === admName || admName.includes(a.n) || a.n.includes(admName)) || null;
 }
 
-const MAX_FAV = 8;
+const MAX_FAV = 9; /* V2.1: 학생당 최대 9개 */
 
-function StudentsTab({ favs, saveFavs, allUnivs, matchStudents = [] }) {
-  const [name, setName] = useState("");
+/* ══════════════ 관심 담기 펼침 창 (V2.1: 관심 학생 탭 대체) ══════════════ */
 
-  const addStudent = () => {
-    if (!name.trim()) return;
-    const f = JSON.parse(JSON.stringify(favs));
-    const ns = { id: "s_" + Date.now(), name: name.trim(), memo: "", items: [] };
-    f.students.push(ns);
-    if (!f.activeId) f.activeId = ns.id;
-    saveFavs(f);
-    setName("");
-  };
-  const removeStudent = (id) => {
-    const f = JSON.parse(JSON.stringify(favs));
-    f.students = f.students.filter(s => s.id !== id);
-    if (f.activeId === id) f.activeId = f.students[0] ? f.students[0].id : null;
-    saveFavs(f);
-  };
-  const setActive = (id) => saveFavs({ ...favs, activeId: id });
-  const removeItem = (sid, key) => {
-    const f = JSON.parse(JSON.stringify(favs));
-    const st = f.students.find(s => s.id === sid);
-    if (st) st.items = st.items.filter(it => it.key !== key);
-    saveFavs(f);
-  };
-  const setLink = (sid, linkId) => {
-    const f = JSON.parse(JSON.stringify(favs));
-    const st = f.students.find(s => s.id === sid);
-    if (st) st.linkId = linkId || null;
-    saveFavs(f);
-  };
-  const linkedOf = (st) => (st.linkId ? matchStudents.find(x => x.id === st.linkId) || null : null);
-  const judgeText = (it, linked) => {
+const escH = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const favOf = (favs, stId) => favs.students.find((s) => s.linkId === stId) || null;
+
+/* 선배 매칭 요약 (출력용) — 선배 매칭 탭의 비교 기준을 그대로 사용 */
+function matchSummaryOf(st, matchData, opts) {
+  if (!st || !matchData || !matchData.grad) return null;
+  const { w, k, trMode } = opts;
+  const tr = trMode === "auto" ? (st.tr || "") : trMode === "all" ? "" : trMode;
+  const m = M_findSimilar(st, matchData.grad.grads, { w, k, tr });
+  if (!m.list.length) return null;
+  return { m, s: M_summarize(m.list, matchData.grad.results), tr, w, k, eq9: M_equiv9(st.top, matchData.grad.scale) };
+}
+
+function printFavs({ st, fav, allUnivs, masked, summary }) {
+  const items = fav ? fav.items.slice(0, MAX_FAV) : [];
+  const canJudge = st.ex && Object.keys(st.ex).length > 0;
+  const who = consultLabelOf(st) + (!masked && st.name ? ` ${st.name}` : "");
+  const judgeText = (it) => {
     const entry = MR_entry(it.univId, it.adm);
-    if (entry) return MR_text(MR_pickCase(entry, it.unit, it.tr), linked.ex) + (entry.note ? ` ※ ${entry.note}` : "");
+    if (entry) return MR_text(MR_pickCase(entry, it.unit, it.tr), st.ex) + (entry.note ? ` ※ ${entry.note}` : "");
     const adm = lookupAdm(allUnivs, it.univId, it.adm);
     return adm && adm.min ? `자동 판정 대상 아님 — 직접 확인 (${adm.min})` : "수능최저 없음";
   };
-  const setMemo = (sid, memo) => {
-    const f = JSON.parse(JSON.stringify(favs));
-    const st = f.students.find(s => s.id === sid);
-    if (st) st.memo = memo;
-    saveFavs(f);
-  };
-
-  /* 출력 */
-  const printStudent = (st) => {
-    const linked = linkedOf(st);
-    const canJudge = linked && linked.ex && Object.keys(linked.ex).length > 0;
-    const items = st.items.slice(0, MAX_FAV);
-    const rows = items.map(it => {
-      const adm = lookupAdm(allUnivs, it.univId, it.adm);
-      return { ...it, admDetail: adm };
-    });
-
-    const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${st.name} — 관심 전형 목록</title>
-<style>
-  @page { margin: 15mm; size: A4; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif; font-size: 11px; color: #1e293b; line-height: 1.5; }
-  .header { border-bottom: 3px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px; }
-  .header h1 { font-size: 18px; font-weight: 900; }
-  .header p { font-size: 10px; color: #64748b; margin-top: 2px; }
-  .card { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; page-break-inside: avoid; }
-  .card-head { background: #f8fafc; padding: 7px 12px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
-  .card-head .univ { font-weight: 800; font-size: 13px; }
-  .card-head .unit { font-size: 12px; color: #475569; }
-  .card-head .badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
-  .badge-교과 { background: #eff6ff; color: #1d4ed8; } .badge-종합 { background: #ecfdf5; color: #047857; }
-  .badge-논술 { background: #f5f3ff; color: #6d28d9; } .badge-정시 { background: #fffbeb; color: #b45309; }
-  .badge-기타 { background: #f1f5f9; color: #475569; }
-  .card-body { padding: 8px 12px; }
-  .row { display: flex; gap: 8px; margin-bottom: 4px; }
-  .label { font-weight: 700; color: #64748b; min-width: 65px; flex-shrink: 0; }
-  .val { color: #1e293b; }
-  .val.rose { color: #be123c; }
-  .memo { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-  .memo-label { font-weight: 800; font-size: 10px; color: #64748b; margin-bottom: 4px; }
-  .memo-text { white-space: pre-wrap; min-height: 30px; }
-  .footer { margin-top: 14px; text-align: center; font-size: 9px; color: #94a3b8; }
-</style></head><body>
-<div class="header">
-  <h1>${st.name} — 관심 전형 목록</h1>
-  <p>2028학년도 대입전형 시행계획 기준 · 최종 모집요강 확인 필요 · 출력일 ${new Date().toISOString().slice(0, 10)}</p>
-  ${canJudge ? `<p>수능최저 판정: ${consultLabelOf(linked)} 학생의 2학년 모의고사(3·6·9·10월) 등급 기준 참고값 (○ 충족 · × 미충족 · – 기록 없음)</p>` : ""}
-</div>
-${rows.map((r, i) => {
-  const a = r.admDetail;
-  return `<div class="card">
-  <div class="card-head">
-    <span class="badge badge-${a ? a.t : '기타'}">${a ? a.t : '?'}</span>
-    <span class="univ">${r.univ}</span>
-    <span class="unit">${r.unit} — ${r.adm} ${r.count}명</span>
-  </div>
+  let sumHtml = "";
+  if (summary) {
+    const { m, s, tr, w, k, eq9 } = summary;
+    const tops = s.univs.filter((u) => u.pass > 0).slice(0, 8).map((u) => `${M_short(u.univ)} ${u.pass}명`).join(", ") || "합격 기록 없음";
+    sumHtml = `<div class="sum">
+  <div class="sum-title">선배 매칭 요약 <span>합격 예측이 아니라, 비슷한 성적이던 졸업 선배들의 실제 결과입니다</span></div>
+  <div class="row"><span class="label">학생 위치</span><span class="val">내신 ${fmtTop(st.top)} (5등급제 평균 ${Number.isFinite(st.nae) ? st.nae.toFixed(2) : "—"}${Number.isFinite(eq9) ? `, 졸업생 기준 9등급제 약 ${eq9.toFixed(1)}` : ""}) · 모의 국·수·탐 백분위 ${fmt1(st.mock)} (2학년 3·9월) · 영어 ${Number.isFinite(st.eng) ? fmt1(st.eng) + "등급" : "—"}</span></div>
+  <div class="row"><span class="label">비교 기준</span><span class="val">${tr ? tr + "계열" : "전체 계열"} · 내신 ${Math.round(w * 100)} : 모의 ${Math.round((1 - w) * 100)} · 비슷한 선배 ${k}명</span></div>
+  <div class="row"><span class="label">선배 결과</span><span class="val">${m.list.length}명 중 수시 합격 ${s.anySusi}명 · 정시 합격 ${s.anyJeong}명</span></div>
+  <div class="row"><span class="label">합격 많은 대학</span><span class="val">${escH(tops)}</span></div>
+  ${m.close < 5 ? `<div class="row"><span class="label"></span><span class="val rose">참고 자료 부족 — 성적이 정말 비슷한 선배가 ${m.close}명뿐입니다.</span></div>` : ""}
+</div>`;
+  }
+  const cards = items.map((r) => {
+    const a = lookupAdm(allUnivs, r.univId, r.adm);
+    return `<div class="card">
+  <div class="card-head"><span class="badge badge-${a ? a.t : "기타"}">${a ? a.t : "?"}</span><span class="univ">${escH(r.univ)}</span><span class="unit">${escH(r.unit)} — ${escH(r.adm)} ${escH(r.count)}명</span></div>
   <div class="card-body">
-    ${a ? `<div class="row"><span class="label">전형 방법</span><span class="val">${a.m}</span></div>
-    <div class="row"><span class="label">모집 인원</span><span class="val">${a.q || '미정'}명 (전체) / ${r.count}명 (해당 학과)</span></div>
-    <div class="row"><span class="label">수능최저</span><span class="val ${a.min ? 'rose' : ''}">${a.min || '없음'}</span></div>`
-    : `<div class="row"><span class="label">모집 인원</span><span class="val">${r.count}명</span></div>
-    <div class="row"><span class="label">전형 상세</span><span class="val">대학별 탭에서 확인하세요</span></div>`}
-    ${canJudge ? `<div class="row"><span class="label">최저 판정</span><span class="val">${judgeText(r, linked)}</span></div>` : ""}
+    ${a ? `<div class="row"><span class="label">전형 방법</span><span class="val">${escH(a.m)}</span></div>
+    <div class="row"><span class="label">모집 인원</span><span class="val">${escH(a.q || "미정")}명 (전체) / ${escH(r.count)}명 (해당 모집단위)</span></div>
+    <div class="row"><span class="label">수능최저</span><span class="val ${a.min ? "rose" : ""}">${escH(a.min || "없음")}</span></div>`
+    : `<div class="row"><span class="label">모집 인원</span><span class="val">${escH(r.count)}명</span></div>`}
+    ${canJudge ? `<div class="row"><span class="label">최저 판정</span><span class="val">${escH(judgeText(r))}</span></div>` : ""}
   </div>
 </div>`;
-}).join("")}
-${st.memo ? `<div class="memo"><div class="memo-label">상담 메모</div><div class="memo-text">${st.memo.replace(/</g, "&lt;")}</div></div>` : ""}
-<div class="footer">2028 대입전형 내비게이터 · 시행계획 기준 발췌 · 최종 모집요강에서 변경 가능</div>
+  }).join("");
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${escH(who)} — 관심 전형 목록</title>
+<style>
+  @page { margin: 14mm; size: A4; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif; font-size: 11px; color: #1e293b; line-height: 1.5; }
+  .header { border-bottom: 3px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
+  .header h1 { font-size: 18px; font-weight: 900; }
+  .header p { font-size: 10px; color: #64748b; margin-top: 2px; }
+  .sum { border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; page-break-inside: avoid; }
+  .sum-title { font-weight: 900; font-size: 12px; margin-bottom: 4px; } .sum-title span { font-weight: 600; font-size: 9.5px; color: #92400e; margin-left: 6px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 9px; overflow: hidden; page-break-inside: avoid; }
+  .card-head { background: #f8fafc; padding: 6px 12px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  .card-head .univ { font-weight: 800; font-size: 13px; } .card-head .unit { font-size: 12px; color: #475569; }
+  .card-head .badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+  .badge-교과 { background: #eff6ff; color: #1d4ed8; } .badge-종합 { background: #ecfdf5; color: #047857; }
+  .badge-논술 { background: #f5f3ff; color: #6d28d9; } .badge-정시 { background: #fffbeb; color: #b45309; } .badge-기타 { background: #f1f5f9; color: #475569; }
+  .card-body { padding: 7px 12px; }
+  .row { display: flex; gap: 8px; margin-bottom: 3px; } .label { font-weight: 700; color: #64748b; min-width: 72px; flex-shrink: 0; }
+  .val { color: #1e293b; } .val.rose { color: #be123c; }
+  .memo { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px; } .memo-label { font-weight: 800; font-size: 10px; color: #64748b; margin-bottom: 4px; }
+  .memo-text { white-space: pre-wrap; min-height: 30px; }
+  .footer { margin-top: 12px; text-align: center; font-size: 9px; color: #94a3b8; }
+</style></head><body>
+<div class="header">
+  <h1>${escH(who)} — 관심 전형 목록</h1>
+  <p>2028학년도 대입전형 시행계획 기준 · 최종 모집요강 확인 필요 · 출력일 ${new Date().toISOString().slice(0, 10)}</p>
+  ${canJudge ? `<p>수능최저 판정: 2학년 모의고사(3·6·9·10월) 등급 기준 참고값 (○ 충족 · × 미충족 · – 기록 없음)</p>` : ""}
+</div>
+${sumHtml}
+${cards || `<p>담은 전형이 없습니다.</p>`}
+${fav && fav.memo ? `<div class="memo"><div class="memo-label">상담 메모</div><div class="memo-text">${escH(fav.memo)}</div></div>` : ""}
+<div class="footer">2028 대입전형 내비게이터 V2.1 · 시행계획 기준 · 최종 모집요강에서 변경 가능</div>
 </body></html>`;
+  const win = window.open("", "_blank", "width=800,height=1000");
+  if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 400); }
+}
 
-    const w = window.open("", "_blank", "width=800,height=1000");
-    if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+function FavPanel({ open, onClose, favs, saveFavs, allUnivs, matchData, students, consult, setConsultId, masked, matchOpts, onGoUnivTab, onGoMatch }) {
+  const [withMatch, setWithMatch] = useState(false);
+  const [linkSel, setLinkSel] = useState({});
+  const [confirmDel, setConfirmDel] = useState("");
+  if (!open) return null;
+  const sids = new Set(students.map((s) => s.id));
+  const mine = consult ? favOf(favs, consult.id) : null;
+  const items = mine ? mine.items.slice(0, MAX_FAV) : [];
+  const others = favs.students.filter((f) => f.linkId && sids.has(f.linkId) && f.items.length && (!consult || f.linkId !== consult.id));
+  const legacy = favs.students.filter((f) => !f.linkId || !sids.has(f.linkId));
+  const nameOf = (st) => consultLabelOf(st) + (!masked && st.name ? ` ${st.name}` : "");
+  const mutate = (fn) => { const f = JSON.parse(JSON.stringify(favs)); fn(f); saveFavs(f); };
+  const ensureMine = (f) => {
+    let x = f.students.find((s) => s.linkId === consult.id);
+    if (!x) { x = { id: "s_" + Date.now(), name: consultLabelOf(consult), memo: "", items: [], linkId: consult.id }; f.students.push(x); }
+    return x;
   };
+  const removeItem = (key) => mutate((f) => { const x = f.students.find((s) => s.linkId === consult.id); if (x) x.items = x.items.filter((it) => it.key !== key); });
+  const setMemo = (memo) => mutate((f) => { ensureMine(f).memo = memo; });
+  const linkLegacy = (lid) => {
+    const sid = linkSel[lid]; const st = students.find((x) => x.id === sid);
+    if (!st) return;
+    mutate((f) => {
+      const L = f.students.find((x) => x.id === lid);
+      const T = f.students.find((x) => x.linkId === sid && x.id !== lid);
+      if (!L) return;
+      if (T) {
+        const keys = new Set(T.items.map((i) => i.key));
+        L.items.forEach((i) => { if (!keys.has(i.key) && T.items.length < MAX_FAV) T.items.push(i); });
+        if (L.memo) T.memo = [T.memo, L.memo].filter(Boolean).join("\n");
+        f.students = f.students.filter((x) => x.id !== lid);
+      } else { L.linkId = sid; L.name = consultLabelOf(st); }
+    });
+  };
+  const delLegacy = (lid) => { mutate((f) => { f.students = f.students.filter((x) => x.id !== lid); }); setConfirmDel(""); };
+  const canSummary = !!(consult && matchData && matchData.grad);
+  const doPrint = () => printFavs({ st: consult, fav: mine, allUnivs, masked, summary: withMatch && canSummary ? matchSummaryOf(consult, matchData, matchOpts) : null });
 
   return (
-    <div className="space-y-5 max-w-4xl">
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 flex gap-2">
-        <Info size={16} className="shrink-0 mt-0.5" />
-        <div>
-          대학별 탭 → 모집단위 표에서 <span className="inline-flex items-center gap-0.5 text-amber-700 font-bold"><Star size={10} className="fill-amber-400 text-amber-400" />전형명 인원</span> 을 클릭하면 담기 대상 학생의 목록에 추가됩니다. 학생당 최대 {MAX_FAV}건.
-          <span className="block mt-1 text-xs text-amber-700">개인정보 보호를 위해 실명 대신 번호·별칭(예: 2-3 김OO) 사용을 권장합니다.</span>
+    <div className="fixed inset-0 z-40 flex justify-end">
+      <div className="absolute inset-0 bg-slate-900/40" onClick={onClose} />
+      <aside className="relative w-full sm:max-w-xl h-full bg-slate-50 overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2">
+          <Star size={17} className="text-amber-500 fill-amber-400" />
+          <h2 className="font-extrabold text-slate-900">관심 담기</h2>
+          <span className="text-sm text-slate-500 truncate">{consult ? nameOf(consult) : "학생 미선택"}</span>
+          {consult && <span className="text-xs font-bold text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">{items.length}/{MAX_FAV}</span>}
+          <button onClick={onClose} className="ml-auto p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="닫기"><X size={18} /></button>
         </div>
-      </div>
 
-      <div className="flex gap-2">
-        <input className={inputCls + " flex-1"} value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") addStudent(); }}
-          placeholder="학생 별칭 입력 (예: 2-3 15번)" />
-        <button onClick={addStudent} className="shrink-0 bg-slate-900 text-white rounded-lg px-4 text-sm font-bold hover:bg-slate-700"><Plus size={14} className="inline -mt-0.5 mr-1" />학생 추가</button>
-      </div>
+        <div className="p-4 space-y-4">
+          {!students.length && (
+            <div className="rounded-xl bg-white ring-1 ring-slate-200 p-4 text-sm text-slate-600">
+              관심 담기는 학생(반·번호)별로 관리합니다. 먼저 <b>선배 매칭</b> 탭에서 재학생 성적 파일을 불러와 주세요.
+              <button onClick={onGoMatch} className="mt-2 block text-xs font-bold text-amber-700 hover:underline">선배 매칭 탭으로 가기 →</button>
+            </div>
+          )}
+          {students.length > 0 && !consult && (
+            <div className="rounded-xl bg-white ring-1 ring-slate-200 p-4 text-sm text-slate-600">화면 맨 위의 <b>학생 [반][번호]</b>에서 학생을 고르면 그 학생의 관심 목록이 나옵니다.</div>
+          )}
 
-      {favs.students.length === 0 ? (
-        <div className="bg-white border border-dashed border-slate-300 rounded-xl p-8 text-center text-sm text-slate-400">아직 등록된 학생이 없습니다.</div>
-      ) : (
-        <div className="space-y-4">
-          {favs.students.map(st => {
-            const active = favs.activeId === st.id;
-            const linked = linkedOf(st);
-            return (
-              <div key={st.id} className={`bg-white rounded-xl border p-4 shadow-sm ${active ? "border-amber-400 ring-2 ring-amber-100" : "border-slate-200"}`}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Users size={15} className="text-slate-400" />
-                  <span className="font-extrabold text-slate-800">{st.name}</span>
-                  <span className="text-xs text-slate-400">{st.items.length}/{MAX_FAV}</span>
-                  {active
-                    ? <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full ring-1 ring-amber-200">담기 대상</span>
-                    : <button onClick={() => setActive(st.id)} className="text-[10px] font-bold text-slate-400 hover:text-amber-600 border border-slate-200 px-2 py-0.5 rounded-full">담기 대상으로</button>}
-                  <div className="ml-auto flex items-center gap-2">
-                    {matchStudents.length > 0 && (
-                      <select value={st.linkId || ""} onChange={e => setLink(st.id, e.target.value)} title="수능최저 판정에 쓸 재학생 성적"
-                        className="text-[11px] rounded-md border border-slate-200 px-1.5 py-1 bg-white max-w-[150px]">
-                        <option value="">성적 연결 안 함</option>
-                        {matchStudents.map(s => <option key={s.id} value={s.id}>{consultLabelOf(s)}</option>)}
-                      </select>
-                    )}
-                    {st.items.length > 0 && (
-                      <button onClick={() => printStudent(st)} className="flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-1.5">
-                        <Printer size={13} /> 출력
-                      </button>
-                    )}
-                    <button onClick={() => removeStudent(st.id)} className="text-slate-300 hover:text-rose-500"><Trash2 size={14} /></button>
+          {consult && (
+            <>
+              <div className="space-y-2">
+                {items.length === 0 ? (
+                  <div className="rounded-xl bg-white border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                    아직 담은 전형이 없습니다. <b>대학별</b> 탭의 모집단위 표에서 전형 칩을 누르면 담깁니다 (최대 {MAX_FAV}개).
+                    <button onClick={onGoUnivTab} className="mt-2 block text-xs font-bold text-amber-700 hover:underline">대학별 탭으로 가기 →</button>
                   </div>
-                </div>
-
-                {st.items.length === 0 ? (
-                  <p className="mt-3 text-xs text-slate-400">대학별 탭의 모집단위 표에서 전형을 클릭해 추가하세요.</p>
-                ) : linked ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-[11px] text-slate-500">수능최저 판정: {consultLabelOf(linked)} 학생의 2학년 모의고사(3·6·9·10월) 기준 참고값</p>
-                    {st.items.slice(0, MAX_FAV).map(it => {
+                ) : (
+                  <>
+                    {consult.ex && Object.keys(consult.ex).length > 0 && <p className="text-[11px] text-slate-500">수능최저 판정: 2학년 모의고사(3·6·9·10월) 기준 참고값</p>}
+                    {items.map((it) => {
                       const adm = lookupAdm(allUnivs, it.univId, it.adm);
                       const c = adm ? TYPE_META[adm.t] || TYPE_META["기타"] : TYPE_META["기타"];
                       const entry = MR_entry(it.univId, it.adm);
                       return (
                         <div key={it.key} className={`rounded-lg px-3 py-2 ring-1 ${c.ring} bg-white`}>
                           <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                            {adm && <TypeBadge t={adm.t} />}
                             <span className={`font-extrabold ${c.text}`}>{it.univ}</span>
                             <span className="text-slate-600">{it.unit}</span>
                             <span className="text-slate-400">·</span>
                             <span className="text-slate-600">{it.adm}</span>
                             <span className="font-bold tabular-nums text-slate-800">{it.count}</span>
-                            <button onClick={() => removeItem(st.id, it.key)} className="ml-auto text-slate-400 hover:text-rose-500"><X size={12} /></button>
+                            <button onClick={() => removeItem(it.key)} className="ml-auto text-slate-400 hover:text-rose-500" title="빼기"><X size={13} /></button>
                           </div>
                           <div className="mt-1.5">
-                            {entry ? <MinJudge entry={entry} student={linked} unit={it.unit} tr={it.tr} />
+                            {entry ? <MinJudge entry={entry} student={consult} unit={it.unit} tr={it.tr} />
                               : <p className="text-[11px] text-slate-400">{adm && adm.min ? `자동 판정 대상이 아닙니다 — 직접 확인 (${adm.min})` : "수능최저 없음"}</p>}
                           </div>
                         </div>
                       );
                     })}
-                  </div>
-                ) : (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {st.items.slice(0, MAX_FAV).map(it => {
-                      const adm = lookupAdm(allUnivs, it.univId, it.adm);
-                      const c = adm ? TYPE_META[adm.t] || TYPE_META["기타"] : TYPE_META["기타"];
-                      return (
-                        <div key={it.key} className={`inline-flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 ring-1 ${c.ring} ${c.bg}`}>
-                          <span className={`font-extrabold ${c.text}`}>{it.univ}</span>
-                          <span className="text-slate-600">{it.unit}</span>
-                          <span className="text-slate-400">·</span>
-                          <span className="text-slate-600">{it.adm}</span>
-                          <span className="font-bold tabular-nums text-slate-800">{it.count}</span>
-                          <button onClick={() => removeItem(st.id, it.key)} className="text-slate-400 hover:text-rose-500 -mr-0.5"><X size={12} /></button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  </>
                 )}
-
-                <textarea
-                  className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-300"
-                  rows={2} placeholder="상담 메모 (자동 저장)"
-                  value={st.memo || ""}
-                  onChange={e => setMemo(st.id, e.target.value)} />
               </div>
-            );
-          })}
+
+              <textarea className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                rows={3} placeholder="상담 메모 (자동 저장)" value={mine ? mine.memo || "" : ""} onChange={(e) => setMemo(e.target.value)} />
+
+              <div className="rounded-xl bg-white ring-1 ring-slate-200 p-3 flex flex-wrap items-center gap-3">
+                <label className={`flex items-center gap-2 text-sm ${canSummary ? "text-slate-700" : "text-slate-400"}`}>
+                  <input type="checkbox" className="w-4 h-4 accent-amber-500" checked={withMatch && canSummary} disabled={!canSummary} onChange={(e) => setWithMatch(e.target.checked)} />
+                  선배 매칭 요약 포함
+                </label>
+                <button onClick={doPrint} disabled={!items.length}
+                  className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-slate-900 text-white text-sm font-bold px-4 py-2 hover:bg-slate-700 disabled:bg-slate-300">
+                  <Printer size={15} /> 출력
+                </button>
+                {!canSummary && <p className="w-full text-[11px] text-slate-400">선배 매칭 요약은 졸업생 진학 결과 파일을 불러오면 넣을 수 있습니다.</p>}
+                {!masked && <p className="w-full text-[11px] text-amber-700">이름 보임 상태라 출력물 제목에 이름이 들어갑니다.</p>}
+              </div>
+            </>
+          )}
+
+          {others.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 mb-1.5">목록이 있는 다른 학생</p>
+              <div className="flex flex-wrap gap-1.5">
+                {others.map((f) => {
+                  const st = students.find((x) => x.id === f.linkId);
+                  return <button key={f.id} onClick={() => setConsultId(f.linkId)} className="text-xs font-bold rounded-full bg-white ring-1 ring-slate-200 px-3 py-1.5 text-slate-700 hover:ring-amber-300 hover:bg-amber-50">{nameOf(st)} <span className="text-slate-400">{f.items.length}/{MAX_FAV}</span></button>;
+                })}
+              </div>
+            </div>
+          )}
+
+          {legacy.length > 0 && students.length > 0 && (
+            <div className="rounded-xl bg-white ring-1 ring-amber-200 p-3">
+              <p className="text-xs font-bold text-amber-800">정리가 필요한 이전 목록 {legacy.length}개</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">예전에 별칭으로 만든 목록입니다. 반·번호를 연결하면 그 학생 목록으로 옮겨지고(이미 목록이 있으면 합쳐짐), 필요 없으면 지우세요.</p>
+              <div className="mt-2 divide-y divide-slate-100">
+                {legacy.map((f) => (
+                  <div key={f.id} className="py-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-bold text-slate-700">{f.name}</span>
+                    <span className="text-slate-400">{f.items.length}개 담김</span>
+                    <span className="ml-auto flex flex-wrap items-center gap-1.5">
+                      <select value={linkSel[f.id] || ""} onChange={(e) => setLinkSel({ ...linkSel, [f.id]: e.target.value })} className="rounded-md border border-slate-200 px-1.5 py-1 bg-white max-w-[160px]">
+                        <option value="">반·번호 선택</option>
+                        {students.map((s) => <option key={s.id} value={s.id}>{nameOf(s)}</option>)}
+                      </select>
+                      <button onClick={() => linkLegacy(f.id)} disabled={!linkSel[f.id]} className="px-2.5 py-1 rounded-md bg-slate-900 text-white font-bold disabled:bg-slate-300">연결</button>
+                      {confirmDel === f.id ? (
+                        <>
+                          <button onClick={() => delLegacy(f.id)} className="px-2.5 py-1 rounded-md bg-rose-600 text-white font-bold">지우기</button>
+                          <button onClick={() => setConfirmDel("")} className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 font-bold">취소</button>
+                        </>
+                      ) : <button onClick={() => setConfirmDel(f.id)} className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 font-bold hover:text-rose-600">삭제</button>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </aside>
     </div>
   );
 }
@@ -2552,15 +2579,14 @@ const simBadge = (d) => d <= 0.15
   ? ["매우 비슷", "bg-emerald-50 text-emerald-700 ring-emerald-200"]
   : d <= M_CLOSE ? ["비슷", "bg-sky-50 text-sky-700 ring-sky-200"] : ["조금 차이", "bg-slate-100 text-slate-500 ring-slate-200"];
 
-function MatchTab({ allUnivs, onGoUniv, data, onSave, selId, setSelId }) {
+function MatchTab({ allUnivs, onGoUniv, data, onSave, selId, setSelId, masked, opts, setOpts }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [ban, setBan] = useState("");
-  const [masked, setMasked] = useState(true);
-  const [w, setW] = useState(0.5);
-  const [k, setK] = useState(15);
-  const [trMode, setTrMode] = useState("auto");
+  const { w, k, trMode } = opts;
+  const setW = (v) => setOpts((o) => ({ ...o, w: v }));
+  const setK = (v) => setOpts((o) => ({ ...o, k: v }));
+  const setTrMode = (v) => setOpts((o) => ({ ...o, trMode: v }));
   const [showAllUniv, setShowAllUniv] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -2602,13 +2628,11 @@ function MatchTab({ allUnivs, onGoUniv, data, onSave, selId, setSelId }) {
 
   const clearAll = () => {
     persist({ grad: null, cur: null });
-    setSelId(""); setBan(""); setConfirmClear(false);
+    setSelId(""); setConfirmClear(false);
     setMsg({ type: "ok", text: "이 기기에 저장된 선배 매칭 자료를 지웠습니다." });
   };
 
   const students = data.cur ? data.cur.students : [];
-  const bans = useMemo(() => Array.from(new Set(students.map((s) => s.ban).filter(Number.isFinite))).sort((a, b) => a - b), [data.cur]);
-  const inBan = students.filter((s) => String(s.ban) === String(ban));
   const st = students.find((s) => s.id === selId) || null;
   const tr = trMode === "auto" ? ((st && st.tr) || "") : trMode === "all" ? "" : trMode;
   const match = useMemo(() => ((st && data.grad) ? M_findSimilar(st, data.grad.grads, { w, k, tr }) : null), [st, data.grad, w, k, tr]);
@@ -2679,27 +2703,13 @@ function MatchTab({ allUnivs, onGoUniv, data, onSave, selId, setSelId }) {
 
       {ready && (
         <>
-          {/* 학생 선택 */}
+          {/* 학생 정보 (학생은 화면 맨 위에서 고름) */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <SectionTitle icon={Users}>학생 선택</SectionTitle>
-              <button onClick={() => setMasked((m) => !m)} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">
-                {masked ? <><EyeOff size={13} /> 이름 가림</> : <><Eye size={13} /> 이름 보임</>}
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <select value={ban} onChange={(e) => { setBan(e.target.value); setSelId(""); }} className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white min-w-[110px]">
-                <option value="">반 선택</option>
-                {bans.map((b) => <option key={b} value={b}>{b}반</option>)}
-              </select>
-              <select value={selId} onChange={(e) => setSelId(e.target.value)} disabled={!ban} className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white min-w-[140px] disabled:bg-slate-50">
-                <option value="">번호 선택</option>
-                {inBan.map((s) => <option key={s.id} value={s.id}>{s.no}번{!masked && s.name ? ` ${s.name}` : ""}</option>)}
-              </select>
-            </div>
+            <SectionTitle icon={Users}>학생 정보</SectionTitle>
+            {!st && <p className="mt-2 text-sm text-slate-500">화면 맨 위의 <b>학생 [반][번호]</b>에서 학생을 고르면 이 학생과 비슷한 선배들의 결과가 나옵니다.</p>}
 
             {st && (
-              <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
                 <div className="rounded-lg bg-slate-900 text-white px-3 py-2.5">
                   <p className="text-xs text-slate-400">학생</p>
                   <p className="font-extrabold">{stLabel}</p>
@@ -2888,7 +2898,6 @@ const TABS = [
   { id: "med", label: "메디컬", icon: Stethoscope },
   { id: "special", label: "특목대", icon: Shield },
   { id: "schedule", label: "일정", icon: Calendar },
-  { id: "students", label: "관심 학생", icon: Users },
   { id: "match", label: "선배 매칭", icon: Target },
   { id: "manage", label: "데이터 관리", icon: Settings },
 ];
@@ -2902,7 +2911,15 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [mobileListOpen, setMobileListOpen] = useState(false);
   const [matchData, setMatchData] = useState({ grad: null, cur: null }); /* 선배 매칭 자료 (이 기기에만 저장) */
-  const [consultId, setConsultId] = useState(""); /* 상담 중인 학생 (저장하지 않음) */
+  const [consultId, setConsultId] = useState(""); /* 화면 맨 위에서 고른 학생 (저장하지 않음) */
+  const [pickBan, setPickBan] = useState("");
+  const [masked, setMasked] = useState(true); /* 이름 가림 (앱 전체) */
+  const [matchOpts, setMatchOpts] = useState({ w: 0.5, k: 15, trMode: "auto" });
+  const [favOpen, setFavOpen] = useState(false);
+  const [backToMatch, setBackToMatch] = useState(false);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef(null);
+  const flashToast = (t) => { setToast(t); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 2800); };
   const matchScrollRef = useRef(0);
 
   useEffect(() => {
@@ -2926,7 +2943,10 @@ export default function App() {
   const matchStudents = (matchData.cur && matchData.cur.students) || [];
   const consult = consultId ? matchStudents.find(s => s.id === consultId) || null : null;
   const consultLabel = consultLabelOf(consult);
-  const goMatch = () => { setTab("match"); setTimeout(() => window.scrollTo(0, matchScrollRef.current), 0); };
+  const bans = useMemo(() => Array.from(new Set(matchStudents.map((x) => x.ban).filter(Number.isFinite))).sort((a, b) => a - b), [matchData]);
+  const inBan = matchStudents.filter((x) => String(x.ban) === String(pickBan));
+  useEffect(() => { if (consult) setPickBan(String(consult.ban)); }, [consultId]);
+  const goMatch = () => { setTab("match"); setBackToMatch(false); setTimeout(() => window.scrollTo(0, matchScrollRef.current), 0); };
   const resetEdits = () => saveEdits(EMPTY_EDITS);
 
   const exportAll = () => {
@@ -2953,31 +2973,27 @@ export default function App() {
   const selUniv = allUnivs.find(u => u.id === sel) || allUnivs[0];
 
   /* 관심 담기 — 모집단위 + 전형 단위 */
-  /* 상담 중인 학생이 있으면 그 학생과 연결된 관심 목록에 담음 */
+  /* 관심 담기는 화면 맨 위에서 고른 학생의 목록에만 담음 */
   const consultFav = consult ? favs.students.find(s => s.linkId === consult.id) || null : null;
-  const activeStudent = consult ? consultFav : (favs.students.find(s => s.id === favs.activeId) || null);
+  const activeStudent = consultFav;
   const favKeys = useMemo(() => new Set(activeStudent ? activeStudent.items.map(it => it.key) : []), [favs]);
-  const hasActiveStudent = !!activeStudent || !!consult;
+  const hasActiveStudent = !!consult;
 
   const toggleFavUnit = (univ, unitObj, admName, count) => {
+    if (!consult) {
+      flashToast(matchStudents.length ? "화면 맨 위에서 학생(반·번호)을 먼저 고르세요." : "선배 매칭 탭에서 재학생 성적 파일을 불러오면 관심 담기를 쓸 수 있습니다.");
+      return;
+    }
     const f = JSON.parse(JSON.stringify(favs));
-    if (consult) {
-      let cs = f.students.find(s => s.linkId === consult.id);
-      if (!cs) { cs = { id: "s_" + Date.now(), name: consultLabel, memo: "", items: [], linkId: consult.id }; f.students.push(cs); }
-      f.activeId = cs.id;
-    }
-    if (f.students.length === 0) {
-      const ns = { id: "s_" + Date.now(), name: "관심 목록", memo: "", items: [] };
-      f.students.push(ns); f.activeId = ns.id;
-    }
-    if (!f.activeId || !f.students.find(s => s.id === f.activeId)) f.activeId = f.students[0].id;
-    const st = f.students.find(s => s.id === f.activeId);
+    let cs = f.students.find(s => s.linkId === consult.id);
+    if (!cs) { cs = { id: "s_" + Date.now(), name: consultLabel, memo: "", items: [], linkId: consult.id }; f.students.push(cs); }
+    f.activeId = cs.id;
     const key = univ.id + "|" + unitObj.n + "|" + admName;
-    const idx = st.items.findIndex(it => it.key === key);
-    if (idx >= 0) { st.items.splice(idx, 1); }
+    const idx = cs.items.findIndex(it => it.key === key);
+    if (idx >= 0) { cs.items.splice(idx, 1); }
     else {
-      if (st.items.length >= 8) return; /* 최대 8개 */
-      st.items.push({ key, univId: univ.id, univ: univ.name, unit: unitObj.n, tr: unitObj.tr, adm: admName, count });
+      if (cs.items.length >= MAX_FAV) { flashToast(`관심 담기는 학생당 최대 ${MAX_FAV}개입니다.`); return; }
+      cs.items.push({ key, univId: univ.id, univ: univ.name, unit: unitObj.n, tr: unitObj.tr, adm: admName, count });
     }
     saveFavs(f);
   };
@@ -2989,13 +3005,47 @@ export default function App() {
     <div className="min-h-screen bg-slate-100 text-slate-900" style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" }}>
       <header className="bg-slate-900 text-white">
         <div className="max-w-6xl mx-auto px-4 py-5">
-          <div className="flex items-center gap-2.5"><GraduationCap size={26} className="text-amber-400" /><h1 className="text-xl font-extrabold tracking-tight">2028 대입전형 내비게이터</h1></div>
+          <div className="flex items-center gap-2.5"><GraduationCap size={26} className="text-amber-400" /><h1 className="text-xl font-extrabold tracking-tight">2028 대입전형 내비게이터</h1><span className="text-[11px] font-extrabold bg-amber-400 text-slate-900 rounded px-1.5 py-0.5">V2.1</span></div>
           <p className="mt-1 text-xs text-slate-400">2028학년도 대입전형 시행계획 기준 · 최종 모집요강에서 변경될 수 있음 — 지원 전 반드시 대학별 요강 확인</p>
-          <div className="mt-4 relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="대학명·모집단위·전형명 검색"
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 pl-9 pr-9 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400" />
-            {query && <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"><X size={15} /></button>}
+          <div className="mt-4 flex flex-col lg:flex-row gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="대학명·모집단위·전형명 검색"
+                className="w-full rounded-xl bg-slate-800 border border-slate-700 pl-9 pr-9 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              {query && <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"><X size={15} /></button>}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 학생 선택 — 모든 탭에 공통 적용 */}
+              <div className={`flex items-center gap-1 rounded-xl border px-2 py-1.5 ${consult ? "bg-amber-400/15 border-amber-400" : "bg-slate-800 border-slate-700"}`}>
+                <Users size={15} className="text-amber-400 shrink-0 ml-0.5" />
+                <span className="text-xs font-bold text-slate-300 mr-0.5">학생</span>
+                {matchStudents.length ? (
+                  <>
+                    <select value={pickBan} onChange={e => { setPickBan(e.target.value); setConsultId(""); }} aria-label="반 선택"
+                      className="bg-transparent text-sm font-bold text-white rounded-md px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                      <option value="" className="text-slate-900">반</option>
+                      {bans.map(b => <option key={b} value={b} className="text-slate-900">{b}반</option>)}
+                    </select>
+                    <select value={consultId} onChange={e => setConsultId(e.target.value)} disabled={!pickBan} aria-label="번호 선택"
+                      className="bg-transparent text-sm font-bold text-white rounded-md px-1 py-0.5 max-w-[150px] disabled:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                      <option value="" className="text-slate-900">번호</option>
+                      {inBan.map(x => <option key={x.id} value={x.id} className="text-slate-900">{x.no}번{!masked && x.name ? ` ${x.name}` : ""}</option>)}
+                    </select>
+                    {consult && <button onClick={() => setConsultId("")} title="학생 선택 해제" className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-700"><X size={14} /></button>}
+                  </>
+                ) : (
+                  <button onClick={goMatch} className="text-xs font-bold text-amber-300 hover:text-amber-200 px-1">재학생 자료 불러오기</button>
+                )}
+              </div>
+              <button onClick={() => setMasked(m => !m)} title="앱 전체의 학생 이름 표시"
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold border ${masked ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-rose-500/20 border-rose-400 text-rose-200"}`}>
+                {masked ? <><EyeOff size={14} /> 이름 가림</> : <><Eye size={14} /> 이름 보임</>}
+              </button>
+              <button onClick={() => setFavOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-extrabold bg-amber-400 text-slate-900 hover:bg-amber-300">
+                <Star size={15} className="fill-slate-900" /> 관심 담기 {consult ? `${consultFav ? consultFav.items.length : 0}/${MAX_FAV}` : ""}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -3003,26 +3053,16 @@ export default function App() {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {TABS.map(t => { const Icon = t.icon; const active = tab === t.id; return (
-            <button key={t.id} onClick={() => { if (tab === "match") matchScrollRef.current = window.scrollY; setTab(t.id); }} className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-bold border-b-2 whitespace-nowrap ${active ? "border-amber-500 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}><Icon size={15} /> {t.label}</button>
+            <button key={t.id} onClick={() => { if (tab === "match") matchScrollRef.current = window.scrollY; setTab(t.id); setBackToMatch(false); }} className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-bold border-b-2 whitespace-nowrap ${active ? "border-amber-500 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}><Icon size={15} /> {t.label}</button>
           ); })}
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {consult && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 ring-1 ring-amber-200 px-3.5 py-2.5">
-            <Target size={15} className="text-amber-600 shrink-0" />
-            <span className="text-sm font-extrabold text-amber-900">상담 중: {consultLabel}</span>
-            <span className="text-xs text-amber-800">대학별·관심 학생 탭에 수능최저 충족 여부가 표시됩니다 (2학년 모의고사 기준 참고)</span>
-            <span className="ml-auto flex gap-1.5">
-              {tab !== "match" && (
-                <button onClick={goMatch} className="inline-flex items-center gap-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5">
-                  <ChevronRight size={13} className="rotate-180" /> 선배 매칭 결과로
-                </button>
-              )}
-              <button onClick={() => setConsultId("")} className="rounded-lg bg-white ring-1 ring-amber-200 text-amber-800 hover:bg-amber-100 text-xs font-bold px-3 py-1.5">상담 끝내기</button>
-            </span>
-          </div>
+        {tab === "univ" && backToMatch && (
+          <button onClick={goMatch} className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-3.5 py-2 shadow-sm">
+            <ChevronRight size={15} className="rotate-180" /> 선배 매칭 결과로 돌아가기
+          </button>
         )}
         {tab === "univ" && (
           <div className="flex flex-col lg:flex-row gap-6">
@@ -3045,16 +3085,14 @@ export default function App() {
               </div>
               {/* 관심 담기 대상 */}
               <div className="mt-3 bg-white rounded-xl border border-slate-200 p-3">
-                <p className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mb-1.5"><Star size={12} className="text-amber-400" /> 관심 담기 대상</p>
+                <p className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mb-1"><Star size={12} className="text-amber-400" /> 관심 담기</p>
                 {consult ? (
-                  <p className="text-xs font-bold text-amber-700">{consultLabel} ({consultFav ? consultFav.items.length : 0}/8)<span className="block text-[10px] font-normal text-slate-500 mt-0.5">상담 중인 학생 목록에 담깁니다</span></p>
-                ) : favs.students.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 leading-relaxed">모집단위 표의 전형 칩을 클릭하면 자동 생성됩니다.</p>
-                ) : (
-                  <select className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white focus:outline-none" value={favs.activeId || ""} onChange={e => saveFavs({ ...favs, activeId: e.target.value })}>
-                    {favs.students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.items.length}/8)</option>)}
-                  </select>
-                )}
+                  <>
+                    <p className="text-xs font-bold text-amber-700">{consultLabel}{!masked && consult.name ? ` ${consult.name}` : ""} ({consultFav ? consultFav.items.length : 0}/{MAX_FAV})</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">모집단위 표의 전형 칩을 누르면 이 학생 목록에 담깁니다.</p>
+                    <button onClick={() => setFavOpen(true)} className="mt-1.5 text-[11px] font-bold text-slate-600 hover:text-amber-700">목록 보기 →</button>
+                  </>
+                ) : <p className="text-[11px] text-slate-400 leading-relaxed">화면 맨 위에서 학생(반·번호)을 고르면 담을 수 있습니다.</p>}
               </div>
             </aside>
             <section className="flex-1 min-w-0">
@@ -3073,16 +3111,20 @@ export default function App() {
         {tab === "med" && <MedTab query={query} />}
         {tab === "special" && <SpecialTab query={query} />}
         {tab === "schedule" && <ScheduleTab events={events} saveEvents={saveEvents} />}
-        {tab === "students" && <StudentsTab favs={favs} saveFavs={saveFavs} allUnivs={allUnivs} matchStudents={matchStudents} />}
         {/* 선배 매칭은 탭을 옮겨도 선택한 학생·비교 기준이 유지되도록 화면을 숨기기만 함 */}
         <div className={tab === "match" ? "" : "hidden"}>
           <MatchTab allUnivs={allUnivs} data={matchData} onSave={saveMatch} selId={consultId} setSelId={setConsultId}
-            onGoUniv={(id) => { matchScrollRef.current = window.scrollY; setSel(id); setTab("univ"); window.scrollTo(0, 0); }} />
+            masked={masked} opts={matchOpts} setOpts={setMatchOpts}
+            onGoUniv={(id) => { matchScrollRef.current = window.scrollY; setSel(id); setTab("univ"); setBackToMatch(true); window.scrollTo(0, 0); }} />
         </div>
+        <FavPanel open={favOpen} onClose={() => setFavOpen(false)} favs={favs} saveFavs={saveFavs} allUnivs={allUnivs}
+          matchData={matchData} students={matchStudents} consult={consult} setConsultId={setConsultId} masked={masked} matchOpts={matchOpts}
+          onGoUnivTab={() => { setFavOpen(false); setTab("univ"); setBackToMatch(false); }} onGoMatch={() => { setFavOpen(false); goMatch(); }} />
+        {toast && <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-slate-900 text-white text-sm font-bold px-4 py-2.5 shadow-lg max-w-[90vw] text-center">{toast}</div>}
         {tab === "manage" && <DataManager univs={allUnivs} edits={edits} onSave={saveEdits} onReset={resetEdits} onExport={exportAll} onImport={importAll} />}
       </main>
       <footer className="max-w-6xl mx-auto px-4 pb-8">
-        <p className="text-[11px] text-slate-400 leading-relaxed">출처: 2028학년도 대입전형 시행계획(쎈 진학자료집 발췌). 모집인원·수능최저·전형방법은 시행계획 기준이며 최종 모집요강에서 변경될 수 있습니다. 관심 학생·일정·추가 데이터·선배 매칭 자료는 사용자 브라우저에만 저장됩니다.</p>
+        <p className="text-[11px] text-slate-400 leading-relaxed">출처: 2028학년도 대입전형 시행계획(쎈 진학자료집 발췌). 모집인원·수능최저·전형방법은 시행계획 기준이며 최종 모집요강에서 변경될 수 있습니다. 관심 담기·일정·추가 데이터·선배 매칭 자료는 사용자 브라우저에만 저장됩니다. · V2.1</p>
       </footer>
     </div>
   );
