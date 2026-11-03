@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search, BookOpen, Cpu, Stethoscope, Shield, Settings,
   Plus, Trash2, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, GraduationCap, Info, X,
@@ -800,7 +800,14 @@ const UNIV_DATA = [
   },
   {
     id: "smwu", name: "숙명여대", region: "서울",
-    changes: [], adms: [], record: "", jeongsi: "",
+    changes: [],
+    adms: [
+      { t:"종합", n:"숙명인재(면접형)", q:"361", min:null, m:"서류100(4배수) → 1단계70 + 면접30" },
+      { t:"종합", n:"소프트웨어인재", q:"35", min:null, m:"서류100(4배수) → 1단계70 + 면접30 (인공지능공학부)" },
+      { t:"교과", n:"지역균형선발", q:"314", min:"인문·자연 없음 / 약학부: 국수영탐(1) 3합5 (수학 포함)", m:"교과70 + 서류30" },
+      { t:"논술", n:"논술우수자", q:"214", min:"국수영탐(1) 2합5 / 약학부: 3합4 (수학 포함)", m:"논술85 + 교과15" },
+      { t:"정시", n:"수능(일반학생)", q:"485", min:null, m:"수능80 + 서류(교과 위주)20 [가군, 인문·자연]" },
+    ], record: "", jeongsi: "",
     full: true,
     units: [
       { n:"한국어문학부", tr:"인문", q:[["숙명인재",12],["지역균형",8],["논술",12],["정시",17]] },
@@ -851,7 +858,14 @@ const UNIV_DATA = [
   },
   {
     id: "hongik", name: "홍익대", region: "서울",
-    changes: [], adms: [], record: "", jeongsi: "",
+    changes: [],
+    adms: [
+      { t:"교과", n:"학교장추천자", q:"420", min:"국수영탐(1) 2합5, 한4", m:"교과95 + 출결5 [졸업예정자]" },
+      { t:"종합", n:"학교생활우수자(서류형)", q:"434", min:"국수영탐(1) 2합5, 한4", m:"서류100" },
+      { t:"종합", n:"학교생활우수자(면접형)", q:"23", min:null, m:"서류100(5배수) → 서류50 + 면접50 (캠퍼스자율전공)" },
+      { t:"논술", n:"논술", q:"384", min:"국수영탐(1) 2합5, 한4", m:"논술90 + 교과10" },
+      { t:"정시", n:"수능우수자", q:"746", min:null, m:"수능90 + 교과10 [다군] / 미술계열 나군: 수능100(3배수) → 60 + 서류40" },
+    ], record: "", jeongsi: "",
     full: true,
     units: [
       { n:"서울캠퍼스자율전공(자연·예능)", tr:"자연", q:[["학교장추천",54],["학교생활우수",68],["논술",53],["정시",93]] },
@@ -886,7 +900,13 @@ const UNIV_DATA = [
   },
   {
     id: "dongguk", name: "동국대", region: "서울",
-    changes: [], adms: [], record: "", jeongsi: "",
+    changes: [],
+    adms: [
+      { t:"종합", n:"Do Dream", q:"894", min:null, m:"서류100(2.5~3.5배수) → 1단계60 + 면접40" },
+      { t:"교과", n:"학교장추천인재", q:"470", min:null, m:"교과70 + 서류30" },
+      { t:"논술", n:"논술", q:"291", min:"국수영사과 2합5, 한4 / 약학과: 3합4, 한4", m:"논술70 + 교과20 + 출결10" },
+      { t:"정시", n:"일반", q:"855", min:null, m:"수능80 + 학생부평가20 [가332·나327·다196]" },
+    ], record: "", jeongsi: "",
     full: true,
     units: [
       { n:"불교학부", tr:"인문", q:[["Do Dream",9],["정시",12]] },
@@ -946,7 +966,15 @@ const UNIV_DATA = [
   },
   {
     id: "kku", name: "건국대", region: "서울",
-    changes: [], adms: [], record: "", jeongsi: "",
+    changes: [
+      "KU지역균형 수능최저 신설: 한국사·국·수·영·탐(1) 5개 중 3개 합 8 (수의예 탐2평균 3합4)",
+    ],
+    adms: [
+      { t:"교과", n:"KU지역균형", q:"348", min:"한국사·국수영탐(1) 5개 중 3합8 / 수의예: 탐2평균 3합4", m:"교과정량70 + 교과정성30" },
+      { t:"종합", n:"KU자기추천", q:"910", min:null, m:"서류100(3배수) → 1단계70 + 면접30" },
+      { t:"논술", n:"KU논술", q:"327", min:"한국사·국수영탐(1) 5개 중 3합8 / 수의예: 탐2평균 3합4", m:"논술100" },
+      { t:"정시", n:"KU일반", q:"1,060", min:null, m:"수능100 (학과·학부 834) / 단과대학 자유전공: 수능90 + 교과정성10 (226)" },
+    ], record: "", jeongsi: "",
     full: true,
     units: [
       { n:"국어국문학과", tr:"인문", q:[["KU지역균형",9],["KU자기추천",15],["KU논술",5]] },
@@ -1002,8 +1030,18 @@ const UNIV_DATA = [
   },
   {
     id: "uos", name: "서울시립대", region: "서울",
-    changes: ["※ 본 자료는 학과별이 아닌 대학 전형별 총계입니다 (세로형 시트에 학과별 미수록). 학과별은 공식 요강 PDF 필요."],
-    adms: [], record: "", jeongsi: "",
+    changes: [
+      "※ 모집단위 목록은 학과별이 아닌 대학 전형별 총계입니다 (학과별 자료 미수록).",
+      "논술: 논술80+교과20 → 논술100, 수능최저 신설 (3합7, 한4)",
+      "고교추천: 추천 인원 제한(20명) 폐지, 교과80+정성20 → 교과60+서류40",
+      "학생부종합전형Ⅱ 폐지 / 정시: 수능100 → 수능80+교과18+출결2",
+    ],
+    adms: [
+      { t:"교과", n:"고교추천", q:"346", min:"국수영탐(1) 3합7, 한4", m:"교과60 + 서류40 [졸업예정자, 추천 인원 제한 없음]" },
+      { t:"종합", n:"학생부종합", q:"424", min:null, m:"서류100(3배수) → 서류50 + 면접50" },
+      { t:"논술", n:"논술", q:"86", min:"국수영탐(1) 3합7, 한4", m:"논술100" },
+      { t:"정시", n:"수능(일반)", q:"674", min:null, m:"수능80 + 교과18 + 출결2 [인문·자연]" },
+    ], record: "", jeongsi: "",
     full: true,
     units: [
       { n:"서울시립대 전체(전형별 총계)", tr:"공통", q:[["고교추천",346],["학생부종합",424],["논술",86],["정시",674]] },
@@ -1246,7 +1284,7 @@ function MinChip({ min }) {
   if (!min) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-500">최저 없음</span>;
   return <span className="inline-flex items-start gap-1 px-2 py-0.5 rounded-full text-xs bg-rose-50 text-rose-700 ring-1 ring-rose-200"><span className="font-bold shrink-0">최저</span><span>{min}</span></span>;
 }
-function AdmCard({ a, custom, onDelete }) {
+function AdmCard({ a, custom, onDelete, judge }) {
   const c = TYPE_META[a.t] || TYPE_META["기타"];
   return (
     <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -1260,6 +1298,12 @@ function AdmCard({ a, custom, onDelete }) {
         </div>
         <p className="mt-2 text-sm text-slate-600 leading-relaxed">{a.m}</p>
         <div className="mt-2"><MinChip min={a.min} /></div>
+        {judge && (
+          <div className="mt-2.5 rounded-lg bg-slate-50 ring-1 ring-slate-200 px-2.5 py-2">
+            <p className="text-[10px] font-bold text-amber-700 mb-1">상담 중 학생 최저 판정 · 2학년 모의고사 기준(참고)</p>
+            {judge}
+          </div>
+        )}
         {custom && <span className="absolute top-2 right-2 text-[10px] text-cyan-600 font-bold">추가됨</span>}
       </div>
     </div>
@@ -1271,7 +1315,7 @@ function SectionTitle({ icon: Icon, children }) {
 
 /* ══════════════ 대학 상세 ══════════════ */
 
-function UnivDetail({ u, customAdms, customUnits, onDeleteAdm, onDeleteUnit, updates, favKeys, onFavUnit, hasActiveStudent }) {
+function UnivDetail({ u, customAdms, customUnits, onDeleteAdm, onDeleteUnit, updates, favKeys, onFavUnit, hasActiveStudent, consult }) {
   const allAdms = [...u.adms.map(a => ({ ...a, _c:false })), ...(customAdms||[]).map(a => ({ ...a, _c:true }))];
   const allUnits = [...(u.units||[]).map(x => ({ ...x, _c:false })), ...(customUnits||[]).map(x => ({ ...x, _c:true }))];
   return (
@@ -1305,7 +1349,13 @@ function UnivDetail({ u, customAdms, customUnits, onDeleteAdm, onDeleteUnit, upd
           <p className="mt-2 text-sm text-slate-400">등록된 전형이 없습니다.</p>
         ) : (
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {allAdms.map((a, i) => <AdmCard key={i} a={a} custom={a._c} onDelete={a._c ? () => onDeleteAdm(a) : null} />)}
+            {allAdms.map((a, i) => {
+              const entry = !a._c && a.min ? MR_entry(u.id, a.n) : null;
+              const judge = consult && a.min
+                ? (entry ? <MinJudge entry={entry} student={consult} /> : <p className="text-[11px] text-slate-400">자동 판정 대상이 아닙니다. 기준을 직접 확인하세요.</p>)
+                : null;
+              return <AdmCard key={i} a={a} custom={a._c} onDelete={a._c ? () => onDeleteAdm(a) : null} judge={judge} />;
+            })}
           </div>
         )}
       </div>
@@ -1531,7 +1581,7 @@ function lookupAdm(allUnivs, univId, admName) {
 
 const MAX_FAV = 8;
 
-function StudentsTab({ favs, saveFavs, allUnivs }) {
+function StudentsTab({ favs, saveFavs, allUnivs, matchStudents = [] }) {
   const [name, setName] = useState("");
 
   const addStudent = () => {
@@ -1556,6 +1606,19 @@ function StudentsTab({ favs, saveFavs, allUnivs }) {
     if (st) st.items = st.items.filter(it => it.key !== key);
     saveFavs(f);
   };
+  const setLink = (sid, linkId) => {
+    const f = JSON.parse(JSON.stringify(favs));
+    const st = f.students.find(s => s.id === sid);
+    if (st) st.linkId = linkId || null;
+    saveFavs(f);
+  };
+  const linkedOf = (st) => (st.linkId ? matchStudents.find(x => x.id === st.linkId) || null : null);
+  const judgeText = (it, linked) => {
+    const entry = MR_entry(it.univId, it.adm);
+    if (entry) return MR_text(MR_pickCase(entry, it.unit, it.tr), linked.ex) + (entry.note ? ` ※ ${entry.note}` : "");
+    const adm = lookupAdm(allUnivs, it.univId, it.adm);
+    return adm && adm.min ? `자동 판정 대상 아님 — 직접 확인 (${adm.min})` : "수능최저 없음";
+  };
   const setMemo = (sid, memo) => {
     const f = JSON.parse(JSON.stringify(favs));
     const st = f.students.find(s => s.id === sid);
@@ -1565,6 +1628,8 @@ function StudentsTab({ favs, saveFavs, allUnivs }) {
 
   /* 출력 */
   const printStudent = (st) => {
+    const linked = linkedOf(st);
+    const canJudge = linked && linked.ex && Object.keys(linked.ex).length > 0;
     const items = st.items.slice(0, MAX_FAV);
     const rows = items.map(it => {
       const adm = lookupAdm(allUnivs, it.univId, it.adm);
@@ -1600,6 +1665,7 @@ function StudentsTab({ favs, saveFavs, allUnivs }) {
 <div class="header">
   <h1>${st.name} — 관심 전형 목록</h1>
   <p>2028학년도 대입전형 시행계획 기준 · 최종 모집요강 확인 필요 · 출력일 ${new Date().toISOString().slice(0, 10)}</p>
+  ${canJudge ? `<p>수능최저 판정: ${consultLabelOf(linked)} 학생의 2학년 모의고사(3·6·9·10월) 등급 기준 참고값 (○ 충족 · × 미충족 · – 기록 없음)</p>` : ""}
 </div>
 ${rows.map((r, i) => {
   const a = r.admDetail;
@@ -1615,6 +1681,7 @@ ${rows.map((r, i) => {
     <div class="row"><span class="label">수능최저</span><span class="val ${a.min ? 'rose' : ''}">${a.min || '없음'}</span></div>`
     : `<div class="row"><span class="label">모집 인원</span><span class="val">${r.count}명</span></div>
     <div class="row"><span class="label">전형 상세</span><span class="val">대학별 탭에서 확인하세요</span></div>`}
+    ${canJudge ? `<div class="row"><span class="label">최저 판정</span><span class="val">${judgeText(r, linked)}</span></div>` : ""}
   </div>
 </div>`;
 }).join("")}
@@ -1649,6 +1716,7 @@ ${st.memo ? `<div class="memo"><div class="memo-label">상담 메모</div><div c
         <div className="space-y-4">
           {favs.students.map(st => {
             const active = favs.activeId === st.id;
+            const linked = linkedOf(st);
             return (
               <div key={st.id} className={`bg-white rounded-xl border p-4 shadow-sm ${active ? "border-amber-400 ring-2 ring-amber-100" : "border-slate-200"}`}>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1659,6 +1727,13 @@ ${st.memo ? `<div class="memo"><div class="memo-label">상담 메모</div><div c
                     ? <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full ring-1 ring-amber-200">담기 대상</span>
                     : <button onClick={() => setActive(st.id)} className="text-[10px] font-bold text-slate-400 hover:text-amber-600 border border-slate-200 px-2 py-0.5 rounded-full">담기 대상으로</button>}
                   <div className="ml-auto flex items-center gap-2">
+                    {matchStudents.length > 0 && (
+                      <select value={st.linkId || ""} onChange={e => setLink(st.id, e.target.value)} title="수능최저 판정에 쓸 재학생 성적"
+                        className="text-[11px] rounded-md border border-slate-200 px-1.5 py-1 bg-white max-w-[150px]">
+                        <option value="">성적 연결 안 함</option>
+                        {matchStudents.map(s => <option key={s.id} value={s.id}>{consultLabelOf(s)}</option>)}
+                      </select>
+                    )}
                     {st.items.length > 0 && (
                       <button onClick={() => printStudent(st)} className="flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-1.5">
                         <Printer size={13} /> 출력
@@ -1670,6 +1745,31 @@ ${st.memo ? `<div class="memo"><div class="memo-label">상담 메모</div><div c
 
                 {st.items.length === 0 ? (
                   <p className="mt-3 text-xs text-slate-400">대학별 탭의 모집단위 표에서 전형을 클릭해 추가하세요.</p>
+                ) : linked ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[11px] text-slate-500">수능최저 판정: {consultLabelOf(linked)} 학생의 2학년 모의고사(3·6·9·10월) 기준 참고값</p>
+                    {st.items.slice(0, MAX_FAV).map(it => {
+                      const adm = lookupAdm(allUnivs, it.univId, it.adm);
+                      const c = adm ? TYPE_META[adm.t] || TYPE_META["기타"] : TYPE_META["기타"];
+                      const entry = MR_entry(it.univId, it.adm);
+                      return (
+                        <div key={it.key} className={`rounded-lg px-3 py-2 ring-1 ${c.ring} bg-white`}>
+                          <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                            <span className={`font-extrabold ${c.text}`}>{it.univ}</span>
+                            <span className="text-slate-600">{it.unit}</span>
+                            <span className="text-slate-400">·</span>
+                            <span className="text-slate-600">{it.adm}</span>
+                            <span className="font-bold tabular-nums text-slate-800">{it.count}</span>
+                            <button onClick={() => removeItem(st.id, it.key)} className="ml-auto text-slate-400 hover:text-rose-500"><X size={12} /></button>
+                          </div>
+                          <div className="mt-1.5">
+                            {entry ? <MinJudge entry={entry} student={linked} unit={it.unit} tr={it.tr} />
+                              : <p className="text-[11px] text-slate-400">{adm && adm.min ? `자동 판정 대상이 아닙니다 — 직접 확인 (${adm.min})` : "수능최저 없음"}</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {st.items.slice(0, MAX_FAV).map(it => {
@@ -1982,6 +2082,8 @@ function M_parseGrad(XLSX, wb) {
   return { grads, results, scale };
 }
 
+const M_EXAMS = ["3월", "6월", "9월", "10월"];
+
 /* 재학생 파일 (현재 2학년) */
 function M_parseCur(XLSX, wb) {
   const S = (n) => M_rows(XLSX, wb.Sheets[n]);
@@ -2024,11 +2126,20 @@ function M_parseCur(XLSX, wb) {
       if (Number.isFinite(e)) st[id].engs.push(e);
     });
   });
+  // 수능최저 판정용: 2학년 3·6·9·10월 등급 [국, 수, 영, 한국사, 사회, 과학]
+  M_EXAMS.forEach((m) => {
+    S(`${m}(2학년)`).slice(3).forEach((r) => {
+      const id = M_sid(r[0]);
+      if (!st[id]) return;
+      const g = [7, 11, 13, 15, 19, 23].map((j) => { const v = M_num(r[j]); return Number.isFinite(v) && v >= 1 && v <= 9 ? v : null; });
+      if (g.some((v) => v !== null)) (st[id].ex = st[id].ex || {})[m] = g;
+    });
+  });
   const students = Object.values(st).map((x) => {
     const su = x.sem.reduce((s, [, u]) => s + u, 0);
     const nae = su ? x.sem.reduce((s, [gr, u]) => s + gr * u, 0) / su : NaN;
     return { id: x.id, ban: x.ban, no: x.no, name: x.name, tr: x.tr, nae, semCount: x.sem.length,
-      mock: M_mean(x.mocks), mockCount: x.mocks.length, eng: M_mean(x.engs) };
+      mock: M_mean(x.mocks), mockCount: x.mocks.length, eng: M_mean(x.engs), ex: x.ex || {} };
   });
   M_addTop(students);
   students.sort((a, b) => (a.ban - b.ban) || (a.no - b.no));
@@ -2131,6 +2242,293 @@ function M_short(univ) {
 }
 
 
+/* ══════════════ 수능최저 판정 ══════════════
+   모의고사 등급 g = [국, 수, 영, 한국사, 사회, 과학]  (2028 수능: 탐구 = 통합사회·통합과학)
+   규칙 r:
+     a    : 반영 영역 글자 (국·수·영·한·탐·사·과). '탐'은 tam 방식으로 계산, '사'·'과'는 따로따로 한 영역
+     tam  : "1" = 사회·과학 중 좋은 1개 / "avg" = 두 과목 평균
+     n    : 고를 영역 수,  sum: 등급 합 이내  또는  each: 각 ○등급 이내
+     need : 반드시 포함할 영역,  needOne: 이 중 하나는 포함
+     eng  : 영어 ○등급 이내(별도 조건),  hist: 한국사 ○등급 이내(별도 조건)
+   기준 출처: 2028학년도 대입전형 시행계획(자료집 요약 + 대학별 시행계획). 최종 모집요강에서 바뀔 수 있음.
+*/
+
+const MR_IDX = { "국": 0, "수": 1, "영": 2, "한": 3 };
+
+function MR_val(code, g, tam) {
+  if (code in MR_IDX) return g[MR_IDX[code]];
+  if (code === "사") return g[4];
+  if (code === "과") return g[5];
+  if (code === "탐") {
+    if (g[4] == null || g[5] == null) return null;
+    return tam === "avg" ? (g[4] + g[5]) / 2 : Math.min(g[4], g[5]);
+  }
+  return null;
+}
+const MR_fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+/* 모의고사 1회 판정 → { ok, text } (자료 없으면 null) */
+function MR_evalOne(r, g) {
+  if (!g) return null;
+  if (!r) return { ok: true, text: "최저 없음" };
+  const codes = r.a.split("");
+  const items = codes.map((c) => [c, MR_val(c, g, r.tam)]);
+  if (items.some(([, v]) => v == null)) return null;
+  const opts = r.needOne ? r.needOne.map((x) => [...(r.need || []), x]) : [r.need || []];
+  let best = null;
+  for (const req of opts) {
+    const chosen = items.filter(([c]) => req.includes(c));
+    const rest = items.filter(([c]) => !req.includes(c)).sort((x, y) => x[1] - y[1]);
+    let ok, text, score;
+    if (r.each != null) {
+      const okRest = rest.filter(([, v]) => v <= r.each);
+      ok = chosen.every(([, v]) => v <= r.each) && chosen.length + okRest.length >= r.n;
+      const show = [...chosen, ...rest].slice(0, r.n);
+      text = show.map(([c, v]) => `${c}${MR_fmt(v)}`).join("·");
+      score = ok ? 0 : 1;
+    } else {
+      const pick = [...chosen, ...rest.slice(0, r.n - chosen.length)];
+      const total = pick.reduce((s, [, v]) => s + v, 0);
+      ok = total <= r.sum + 1e-9;
+      text = `${pick.map(([c, v]) => `${c}${MR_fmt(v)}`).join("+")}=${MR_fmt(total)}`;
+      score = total;
+    }
+    if (!best || (ok && !best.ok) || (ok === best.ok && score < best.score)) best = { ok, text, score };
+  }
+  const extra = [];
+  if (r.eng != null) { const e = g[2]; if (e == null) return null; if (e > r.eng) { best.ok = false; } extra.push(`영${e}`); }
+  if (r.hist != null) { const h = g[3]; if (h == null) return null; if (h > r.hist) { best.ok = false; } extra.push(`한${h}`); }
+  return { ok: best.ok, text: best.text + (extra.length ? ` / ${extra.join("·")}` : "") };
+}
+
+/* 규칙 → 사람이 읽는 문장 */
+function MR_label(r) {
+  if (!r) return "최저 없음";
+  let area = r.a.replace("탐", r.tam === "avg" ? "탐(2과목 평균)" : "탐(1)");
+  if (r.a.includes("사") && r.a.includes("과")) area = area.replace("사과", "사·과");
+  if (area.startsWith("한")) area = "한국사·" + area.slice(1);
+  let core = r.each != null ? `${r.n}개 각 ${r.each}등급` : `${r.n}합${r.sum}`;
+  const cond = [];
+  if (r.need && r.need.length) cond.push(`${r.need.join("·")} 포함`);
+  if (r.needOne) cond.push(`${r.needOne.join("·")} 중 1개 포함`);
+  const tail = [r.eng != null ? `영${r.eng}` : null, r.hist != null ? `한${r.hist}` : null].filter(Boolean);
+  return `${area} ${core}${cond.length ? `(${cond.join(", ")})` : ""}${tail.length ? `, ${tail.join("·")}` : ""}`;
+}
+
+/* 영역 묶음 줄임 */
+const R = (a, n, sumOrEach, extra = {}) => {
+  const { each, ...rest } = extra;
+  return { a, n, ...(each ? { each: sumOrEach } : { sum: sumOrEach }), tam: "1", ...rest };
+};
+const NONE = null;
+const MED_KHU = /의예|한의예|치의예|약학/;
+
+/* 대학별 규칙. keys: 전형명(전형 카드) 또는 모집단위 칩 이름. cases: 위에서부터 맞는 첫 경우 사용 */
+const MIN_RULES = {
+  korea: [
+    { keys: ["학교추천"], cases: [
+      { label: "의학과", units: /의학/, r: R("국수영탐", 4, 5, { hist: 4 }) },
+      { label: "의학과 외", r: NONE }] },
+    { keys: ["학업우수"], cases: [
+      { label: "의학과", units: /의학/, r: R("국수영탐", 4, 5, { hist: 4 }) },
+      { label: "공통", r: R("국수영탐", 4, 9, { hist: 4 }) }] },
+    { keys: ["논술"], cases: [{ label: "공통", r: R("국수영탐", 4, 8, { hist: 4 }) }] },
+  ],
+  yonsei: [
+    { keys: ["추천형"], note: "탐구 반영 방식(2과목 평균 여부)은 최종 요강 확인", cases: [
+      { label: "의·치·약", units: /의예|치의예|약학/, r: R("국수탐", 2, 1, { each: true, need: ["수"], tam: "avg", eng: 3, hist: 4 }) },
+      { label: "자연", tr: "자연", r: R("국수탐", 2, 5, { need: ["수"], tam: "avg", eng: 3, hist: 4 }) },
+      { label: "인문·기타", r: R("국수탐", 2, 4, { needOne: ["국", "수"], tam: "avg", eng: 3, hist: 4 }) }] },
+    { keys: ["종합인재형"], note: "탐구 반영 방식(2과목 평균 여부)은 최종 요강 확인", cases: [
+      { label: "언더우드(인문사회·생명과학공학)", units: /언더우드/, r: NONE },
+      { label: "의·치·약", units: /의예|치의예|약학/, r: R("국수탐", 2, 1, { each: true, need: ["수"], tam: "avg", eng: 3, hist: 4 }) },
+      { label: "자연", tr: "자연", r: R("국수탐", 2, 5, { need: ["수"], tam: "avg", eng: 3, hist: 4 }) },
+      { label: "인문·기타", r: R("국수탐", 2, 4, { needOne: ["국", "수"], tam: "avg", eng: 3, hist: 4 }) }] },
+    { keys: ["논술전형", "논술"], cases: [
+      { label: "약학", units: /약학/, r: R("국수사과", 3, 5, { need: ["국", "수"], eng: 3, hist: 4 }) },
+      { label: "공통", r: R("국수사과", 3, 6, { need: ["국", "수"], eng: 3, hist: 4 }) }] },
+  ],
+  sogang: [
+    { keys: ["지역균형"], cases: [{ label: "공통", r: R("국수영탐", 3, 3, { each: true, hist: 4 }) }] },
+    { keys: ["일반Ⅱ"], cases: [{ label: "공통", r: R("국수영탐", 3, 7, { hist: 4 }) }] },
+    { keys: ["일반(논술)", "논술"], cases: [{ label: "공통", r: R("국수영탐", 3, 7, { hist: 4 }) }] },
+  ],
+  skku: [
+    { keys: ["추천인재"], note: "3합6 적용 모집단위(자유전공·글로벌·반도체 등)는 최종 요강 확인", cases: [
+      { label: "자유전공·글로벌·반도체 등", units: /자유전공|글로벌|반도체/, r: R("국수영사과", 3, 6) },
+      { label: "그 외", r: R("국수영사과", 3, 7) }] },
+    { keys: ["융합인재(서류형)", "융합인재"], cases: [{ label: "공통", r: R("국수영사과", 3, 6) }] },
+    { keys: ["논술(언어형)", "논술 언어"], note: "일부 모집단위 3합5 — 최종 요강 확인", cases: [{ label: "공통", r: R("국수영사과", 3, 6) }] },
+    { keys: ["논술(수리형)", "논술 수리"], note: "일부 모집단위 3합5 — 최종 요강 확인", cases: [
+      { label: "의예", units: /의예/, r: R("국수영탐", 4, 5, { tam: "avg" }) },
+      { label: "공통", r: R("국수영사과", 3, 6) }] },
+  ],
+  hanyang: [
+    { keys: ["추천형"], cases: [
+      { label: "의류·실내건축", units: /의류|실내건축/, r: R("국수영탐", 3, 3, { each: true }) },
+      { label: "상경·인터칼리지", units: /경영|경제금융|파이낸스|인터칼리지|정보시스템/, r: R("국수영탐", 3, 3, { each: true, need: ["수"] }) },
+      { label: "인문", tr: "인문", r: R("국수영탐", 3, 3, { each: true }) },
+      { label: "자연", r: R("국수영탐", 3, 3, { each: true, need: ["수"] }) }] },
+    { keys: ["학업형"], cases: [
+      { label: "의예", units: /의예/, r: R("국수영탐", 3, 4, { tam: "avg" }) },
+      { label: "상경", units: /경영|경제금융|파이낸스|정보시스템/, r: R("국수영사과", 3, 7, { need: ["수"] }) },
+      { label: "인문", tr: "인문", r: R("국수영사과", 3, 7) },
+      { label: "자연", r: R("국수영사과", 3, 7, { need: ["수"] }) }] },
+    { keys: ["논술"], cases: [
+      { label: "의예", units: /의예/, r: R("국수영탐", 3, 4, { tam: "avg" }) },
+      { label: "공통", r: R("국수영탐", 3, 7) }] },
+  ],
+  cau: [
+    { keys: ["지역균형"], note: "영어 2등급(누적 20% 미만)을 1등급으로 보는 규정은 판정에 넣지 않음", cases: [
+      { label: "약학", units: /약학/, r: R("국수영사과", 4, 5, { hist: 4 }) },
+      { label: "공통", r: R("국수영사과", 3, 7, { hist: 4 }) }] },
+    { keys: ["최저 있는 학종(Up)", "Up"], note: "반영 영역은 지역균형과 같다고 보고 판정 — 최종 요강 확인", cases: [
+      { label: "의학부", units: /의학/, r: R("국수영탐", 4, 5, { tam: "avg", hist: 4 }) },
+      { label: "약학", units: /약학/, r: R("국수영사과", 4, 5, { hist: 4 }) },
+      { label: "공통", r: R("국수영사과", 3, 6, { hist: 4 }) }] },
+    { keys: ["모두의 논술"], cases: [
+      { label: "의학부", units: /의학/, r: R("국수영탐", 4, 5, { tam: "avg", hist: 4 }) },
+      { label: "약학", units: /약학/, r: R("국수영사과", 4, 5, { hist: 4 }) },
+      { label: "공통", r: R("국수영사과", 3, 6, { hist: 4 }) }] },
+    { keys: ["수능67"], cases: [
+      { label: "의학부", units: /의학/, r: R("국수영탐", 4, 5, { tam: "avg" }) },
+      { label: "약학", units: /약학/, r: R("국수영사과", 4, 5) },
+      { label: "공통", r: R("국수영사과", 3, 7) }] },
+  ],
+  khu: [
+    { keys: ["지역균형"], cases: [
+      { label: "의·한·치·약", units: MED_KHU, r: R("국수영탐", 3, 4, { tam: "avg", hist: 5 }) },
+      { label: "예체능", tr: "예체", r: R("국수영탐", 1, 1, { each: true, hist: 5 }) },
+      { label: "공통", r: R("국수영탐", 2, 5, { hist: 5 }) }] },
+    { keys: ["네오르네상스(서류형)", "서류형"], cases: [
+      { label: "의·한·치·약", units: MED_KHU, r: R("국수영탐", 3, 4, { hist: 5 }) },
+      { label: "공통", r: R("국수영탐", 2, 5, { hist: 5 }) }] },
+    { keys: ["논술우수자", "논술"], cases: [
+      { label: "의·한·치·약", units: MED_KHU, r: R("국수영탐", 3, 4, { hist: 5 }) },
+      { label: "체육", units: /체육|스포츠/, r: R("국수영탐", 1, 1, { each: true, hist: 5 }) },
+      { label: "공통", r: R("국수영탐", 2, 5, { hist: 5 }) }] },
+  ],
+  hufs: [
+    { keys: ["학교장추천"], note: "글로벌캠퍼스 모집단위는 2합6", cases: [{ label: "서울캠", r: R("국수영탐", 2, 5) }] },
+    { keys: ["논술"], note: "글로벌캠퍼스 모집단위는 2합6", cases: [{ label: "서울캠", r: R("국수영탐", 2, 5) }] },
+  ],
+  ewha: [
+    { keys: ["고교추천"], cases: [{ label: "공통", r: R("국수영탐", 3, 7) }] },
+    { keys: ["미래인재(서류형)", "서류형"], cases: [
+      { label: "의예", units: /의예/, r: R("국수영탐", 4, 5) },
+      { label: "약학", units: /약학/, r: R("국수영탐", 4, 6) },
+      { label: "스크랜튼", units: /스크랜튼/, r: R("국수영탐", 3, 5) },
+      { label: "국제학부", units: /국제학/, r: R("국수영탐", 3, 7, { need: ["국"], eng: 2 }) },
+      { label: "공통", r: R("국수영탐", 3, 7) }] },
+    { keys: ["논술"], cases: [
+      { label: "의예", units: /의예/, r: R("국수영탐", 4, 5) },
+      { label: "약학", units: /약학/, r: R("국수영탐", 4, 6) },
+      { label: "스크랜튼", units: /스크랜튼/, r: R("국수영탐", 3, 5) },
+      { label: "공통", r: R("국수영탐", 3, 7) }] },
+  ],
+  uos: [
+    { keys: ["고교추천"], cases: [{ label: "공통", r: R("국수영탐", 3, 7, { hist: 4 }) }] },
+    { keys: ["논술"], cases: [{ label: "공통", r: R("국수영탐", 3, 7, { hist: 4 }) }] },
+  ],
+  kku: [
+    { keys: ["KU지역균형"], cases: [
+      { label: "수의예과", units: /수의/, r: R("한국수영탐", 3, 4, { tam: "avg" }) },
+      { label: "인문·자연", r: R("한국수영탐", 3, 8) }] },
+    { keys: ["KU논술"], cases: [
+      { label: "수의예과", units: /수의/, r: R("한국수영탐", 3, 4, { tam: "avg" }) },
+      { label: "인문·자연", r: R("한국수영탐", 3, 8) }] },
+  ],
+  dongguk: [
+    { keys: ["논술"], cases: [
+      { label: "약학과", units: /약학/, r: R("국수영사과", 3, 4, { hist: 4 }) },
+      { label: "공통", r: R("국수영사과", 2, 5, { hist: 4 }) }] },
+  ],
+  hongik: [
+    { keys: ["학교장추천자", "학교장추천"], cases: [{ label: "공통", r: R("국수영탐", 2, 5, { hist: 4 }) }] },
+    { keys: ["학교생활우수자(서류형)", "학교생활우수"], note: "면접형(캠퍼스자율전공)은 최저 없음", cases: [{ label: "서류형", r: R("국수영탐", 2, 5, { hist: 4 }) }] },
+    { keys: ["논술"], cases: [{ label: "공통", r: R("국수영탐", 2, 5, { hist: 4 }) }] },
+  ],
+  smwu: [
+    { keys: ["지역균형선발", "지역균형"], cases: [
+      { label: "약학부", units: /약학/, r: R("국수영탐", 3, 5, { need: ["수"] }) },
+      { label: "약학부 외", r: NONE }] },
+    { keys: ["논술우수자", "논술"], cases: [
+      { label: "약학부", units: /약학/, r: R("국수영탐", 3, 4, { need: ["수"] }) },
+      { label: "공통", r: R("국수영탐", 2, 5) }] },
+  ],
+};
+
+function MR_entry(univId, name) {
+  return (MIN_RULES[univId] || []).find((e) => e.keys.includes(name)) || null;
+}
+/* 모집단위·계열에 맞는 경우 고르기 */
+function MR_pickCase(entry, unit, tr) {
+  if (!entry) return null;
+  const u = unit || "";
+  return entry.cases.find((c) => c.units && c.units.test(u))
+    || entry.cases.find((c) => !c.units && c.tr && c.tr === tr)
+    || entry.cases.find((c) => !c.units && !c.tr)
+    || entry.cases[entry.cases.length - 1];
+}
+/* 회차별 판정 → { rows:[{m, res}], ok, total } */
+function MR_evalAll(r, ex) {
+  const rows = M_EXAMS.map((m) => ({ m, res: ex && ex[m] ? MR_evalOne(r, ex[m]) : null }));
+  const have = rows.filter((x) => x.res);
+  return { rows, ok: have.filter((x) => x.res.ok).length, total: have.length };
+}
+
+/* 판정 표시 (화면용) */
+function MinJudgeRow({ c, ex }) {
+  if (!c) return null;
+  if (!c.r) return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="font-bold text-slate-600">{c.label}</span><span className="text-slate-400">최저 없음</span>
+    </div>
+  );
+  const res = MR_evalAll(c.r, ex);
+  const last = [...res.rows].reverse().find((x) => x.res);
+  return (
+    <div className="text-xs">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-bold text-slate-700">{c.label}</span>
+        <span className="text-slate-500">{MR_label(c.r)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        {res.rows.map(({ m, res: x }) => (
+          <span key={m} title={x ? x.text : "응시 기록 없음"}
+            className={`px-1.5 py-0.5 rounded font-bold ${!x ? "bg-slate-100 text-slate-400" : x.ok ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+            {m} {!x ? "–" : x.ok ? "✓" : "✗"}
+          </span>
+        ))}
+        <span className={`ml-1 font-extrabold ${!res.total ? "text-slate-400" : res.ok === res.total ? "text-emerald-700" : res.ok === 0 ? "text-rose-700" : "text-amber-700"}`}>
+          {res.total ? `${res.total}회 중 ${res.ok}회 충족` : "판정 자료 없음"}
+        </span>
+        {last && <span className="text-[11px] text-slate-400">({last.m}: {last.res.text})</span>}
+      </div>
+    </div>
+  );
+}
+function MinJudge({ entry, student, unit, tr }) {
+  if (!student || !entry) return null;
+  if (!student.ex || !Object.keys(student.ex).length)
+    return <p className="text-[11px] text-slate-400">모의고사 등급 정보가 없습니다. 선배 매칭 탭에서 재학생 파일을 다시 불러오세요.</p>;
+  const cases = unit !== undefined ? [MR_pickCase(entry, unit, tr)] : entry.cases;
+  return (
+    <div className="space-y-1.5">
+      {cases.map((c, i) => <MinJudgeRow key={i} c={c} ex={student.ex} />)}
+      {entry.note && <p className="text-[10px] text-slate-400">※ {entry.note}</p>}
+    </div>
+  );
+}
+/* 판정 표시 (출력용 글자) */
+function MR_text(c, ex) {
+  if (!c) return "";
+  if (!c.r) return `${c.label}: 최저 없음`;
+  const res = MR_evalAll(c.r, ex);
+  return `${c.label} ${MR_label(c.r)} → ${res.rows.map(({ m, res: x }) => `${m} ${!x ? "–" : x.ok ? "○" : "×"}`).join(" · ")} (${res.total}회 중 ${res.ok}회 충족)`;
+}
+const consultLabelOf = (st) => (st ? `2학년 ${st.ban}반 ${st.no}번` : "");
+
 /* ══════════════ 선배 매칭 탭 ══════════════ */
 
 const MATCH_KEY = "ipsi2028-match";
@@ -2154,13 +2552,11 @@ const simBadge = (d) => d <= 0.15
   ? ["매우 비슷", "bg-emerald-50 text-emerald-700 ring-emerald-200"]
   : d <= M_CLOSE ? ["비슷", "bg-sky-50 text-sky-700 ring-sky-200"] : ["조금 차이", "bg-slate-100 text-slate-500 ring-slate-200"];
 
-function MatchTab({ allUnivs, onGoUniv }) {
-  const [data, setData] = useState({ grad: null, cur: null });
+function MatchTab({ allUnivs, onGoUniv, data, onSave, selId, setSelId }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [ban, setBan] = useState("");
-  const [selId, setSelId] = useState("");
   const [masked, setMasked] = useState(true);
   const [w, setW] = useState(0.5);
   const [k, setK] = useState(15);
@@ -2168,14 +2564,7 @@ function MatchTab({ allUnivs, onGoUniv }) {
   const [showAllUniv, setShowAllUniv] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const raw = await store.get(MATCH_KEY);
-      if (raw) { try { const p = JSON.parse(raw); setData({ grad: p.grad || null, cur: p.cur || null }); } catch (e) {} }
-    })();
-  }, []);
-
-  const persist = (next) => { setData(next); store.set(MATCH_KEY, JSON.stringify(next)); };
+  const persist = onSave;
 
   const onFiles = async (fileList) => {
     const files = Array.from(fileList || []);
@@ -2446,17 +2835,20 @@ function MatchTab({ allUnivs, onGoUniv }) {
 
                   {/* 비슷한 선배 목록 */}
                   <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                    <SectionTitle icon={Users}>비슷한 선배 {match.list.length}명</SectionTitle>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <SectionTitle icon={Users}>비슷한 선배 {match.list.length}명</SectionTitle>
+                      <span className="text-xs text-slate-500">이 학생 영어 <b className="text-slate-700">{Number.isFinite(st.eng) ? `${fmt1(st.eng)}등급` : "—"}</b> (영어는 비교용으로만 표시, 매칭 계산에는 미반영)</span>
+                    </div>
                     <div className="mt-3 divide-y divide-slate-100">
                       {match.list.map((g, i) => {
                         const [bl, bc] = simBadge(g.d);
                         const passes = summ.passBy[g.id] || [];
                         return (
                           <div key={g.id} className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1.5 sm:gap-3">
-                            <div className="sm:w-60 shrink-0 flex flex-wrap items-center gap-1.5">
+                            <div className="sm:w-72 shrink-0 flex flex-wrap items-center gap-1.5">
                               <span className="font-extrabold text-slate-800 w-14">{nbLabel(i)}</span>
                               <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ring-1 ${bc}`}>{bl}</span>
-                              <span className="text-xs text-slate-500">{g.tr || "-"} · 내신 {fmtTop(g.top)} · 모의 {fmt1(g.mock)}</span>
+                              <span className="text-xs text-slate-500">{g.tr || "-"} · 내신 {fmtTop(g.top)} · 모의 {fmt1(g.mock)} · <b className="text-slate-700">영어 {Number.isFinite(g.eng) ? `${fmt1(g.eng)}등급` : "—"}</b></span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 text-xs">
                               {passes.length ? passes.map((r, j) => (
@@ -2509,6 +2901,9 @@ export default function App() {
   const [favs, setFavs] = useState(EMPTY_FAVS);
   const [events, setEvents] = useState([]);
   const [mobileListOpen, setMobileListOpen] = useState(false);
+  const [matchData, setMatchData] = useState({ grad: null, cur: null }); /* 선배 매칭 자료 (이 기기에만 저장) */
+  const [consultId, setConsultId] = useState(""); /* 상담 중인 학생 (저장하지 않음) */
+  const matchScrollRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -2516,6 +2911,8 @@ export default function App() {
       if (e) { try { setEdits({ ...EMPTY_EDITS, ...JSON.parse(e) }); } catch (err) {} }
       const f = await store.get(FAV_KEY);
       if (f) { try { setFavs({ ...EMPTY_FAVS, ...JSON.parse(f) }); } catch (err) {} }
+      const mraw = await store.get(MATCH_KEY);
+      if (mraw) { try { const p = JSON.parse(mraw); setMatchData({ grad: p.grad || null, cur: p.cur || null }); } catch (err) {} }
       const ev = await store.get(EVENT_KEY);
       if (ev) { try { setEvents(JSON.parse(ev)); } catch (err) { setEvents(SEED_EVENTS); } }
       else { setEvents(SEED_EVENTS); store.set(EVENT_KEY, JSON.stringify(SEED_EVENTS)); }
@@ -2525,6 +2922,11 @@ export default function App() {
   const saveEdits = (next) => { setEdits(next); store.set(STORAGE_KEY, JSON.stringify(next)); };
   const saveFavs = (next) => { setFavs(next); store.set(FAV_KEY, JSON.stringify(next)); };
   const saveEvents = (next) => { setEvents(next); store.set(EVENT_KEY, JSON.stringify(next)); };
+  const saveMatch = (next) => { setMatchData(next); store.set(MATCH_KEY, JSON.stringify(next)); };
+  const matchStudents = (matchData.cur && matchData.cur.students) || [];
+  const consult = consultId ? matchStudents.find(s => s.id === consultId) || null : null;
+  const consultLabel = consultLabelOf(consult);
+  const goMatch = () => { setTab("match"); setTimeout(() => window.scrollTo(0, matchScrollRef.current), 0); };
   const resetEdits = () => saveEdits(EMPTY_EDITS);
 
   const exportAll = () => {
@@ -2551,12 +2953,19 @@ export default function App() {
   const selUniv = allUnivs.find(u => u.id === sel) || allUnivs[0];
 
   /* 관심 담기 — 모집단위 + 전형 단위 */
-  const activeStudent = favs.students.find(s => s.id === favs.activeId) || null;
+  /* 상담 중인 학생이 있으면 그 학생과 연결된 관심 목록에 담음 */
+  const consultFav = consult ? favs.students.find(s => s.linkId === consult.id) || null : null;
+  const activeStudent = consult ? consultFav : (favs.students.find(s => s.id === favs.activeId) || null);
   const favKeys = useMemo(() => new Set(activeStudent ? activeStudent.items.map(it => it.key) : []), [favs]);
-  const hasActiveStudent = !!activeStudent;
+  const hasActiveStudent = !!activeStudent || !!consult;
 
   const toggleFavUnit = (univ, unitObj, admName, count) => {
     const f = JSON.parse(JSON.stringify(favs));
+    if (consult) {
+      let cs = f.students.find(s => s.linkId === consult.id);
+      if (!cs) { cs = { id: "s_" + Date.now(), name: consultLabel, memo: "", items: [], linkId: consult.id }; f.students.push(cs); }
+      f.activeId = cs.id;
+    }
     if (f.students.length === 0) {
       const ns = { id: "s_" + Date.now(), name: "관심 목록", memo: "", items: [] };
       f.students.push(ns); f.activeId = ns.id;
@@ -2594,12 +3003,27 @@ export default function App() {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {TABS.map(t => { const Icon = t.icon; const active = tab === t.id; return (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-bold border-b-2 whitespace-nowrap ${active ? "border-amber-500 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}><Icon size={15} /> {t.label}</button>
+            <button key={t.id} onClick={() => { if (tab === "match") matchScrollRef.current = window.scrollY; setTab(t.id); }} className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-bold border-b-2 whitespace-nowrap ${active ? "border-amber-500 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}><Icon size={15} /> {t.label}</button>
           ); })}
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
+        {consult && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 ring-1 ring-amber-200 px-3.5 py-2.5">
+            <Target size={15} className="text-amber-600 shrink-0" />
+            <span className="text-sm font-extrabold text-amber-900">상담 중: {consultLabel}</span>
+            <span className="text-xs text-amber-800">대학별·관심 학생 탭에 수능최저 충족 여부가 표시됩니다 (2학년 모의고사 기준 참고)</span>
+            <span className="ml-auto flex gap-1.5">
+              {tab !== "match" && (
+                <button onClick={goMatch} className="inline-flex items-center gap-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5">
+                  <ChevronRight size={13} className="rotate-180" /> 선배 매칭 결과로
+                </button>
+              )}
+              <button onClick={() => setConsultId("")} className="rounded-lg bg-white ring-1 ring-amber-200 text-amber-800 hover:bg-amber-100 text-xs font-bold px-3 py-1.5">상담 끝내기</button>
+            </span>
+          </div>
+        )}
         {tab === "univ" && (
           <div className="flex flex-col lg:flex-row gap-6">
             <aside className="lg:w-52 shrink-0">
@@ -2622,7 +3046,9 @@ export default function App() {
               {/* 관심 담기 대상 */}
               <div className="mt-3 bg-white rounded-xl border border-slate-200 p-3">
                 <p className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mb-1.5"><Star size={12} className="text-amber-400" /> 관심 담기 대상</p>
-                {favs.students.length === 0 ? (
+                {consult ? (
+                  <p className="text-xs font-bold text-amber-700">{consultLabel} ({consultFav ? consultFav.items.length : 0}/8)<span className="block text-[10px] font-normal text-slate-500 mt-0.5">상담 중인 학생 목록에 담깁니다</span></p>
+                ) : favs.students.length === 0 ? (
                   <p className="text-[11px] text-slate-400 leading-relaxed">모집단위 표의 전형 칩을 클릭하면 자동 생성됩니다.</p>
                 ) : (
                   <select className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white focus:outline-none" value={favs.activeId || ""} onChange={e => saveFavs({ ...favs, activeId: e.target.value })}>
@@ -2637,7 +3063,7 @@ export default function App() {
                   customAdms={edits.admAdds[selUniv.id]} customUnits={edits.unitAdds[selUniv.id]}
                   onDeleteAdm={(a) => deleteAdm(selUniv.id, a)} onDeleteUnit={(un) => deleteUnit(selUniv.id, un)}
                   updates={edits.updates ? edits.updates[selUniv.id] : null}
-                  favKeys={favKeys} onFavUnit={toggleFavUnit} hasActiveStudent={hasActiveStudent} />
+                  favKeys={favKeys} onFavUnit={toggleFavUnit} hasActiveStudent={hasActiveStudent} consult={consult} />
               ) : <p className="text-sm text-slate-400">대학을 선택하세요.</p>}
             </section>
           </div>
@@ -2647,8 +3073,12 @@ export default function App() {
         {tab === "med" && <MedTab query={query} />}
         {tab === "special" && <SpecialTab query={query} />}
         {tab === "schedule" && <ScheduleTab events={events} saveEvents={saveEvents} />}
-        {tab === "students" && <StudentsTab favs={favs} saveFavs={saveFavs} allUnivs={allUnivs} />}
-        {tab === "match" && <MatchTab allUnivs={allUnivs} onGoUniv={(id) => { setSel(id); setTab("univ"); window.scrollTo(0, 0); }} />}
+        {tab === "students" && <StudentsTab favs={favs} saveFavs={saveFavs} allUnivs={allUnivs} matchStudents={matchStudents} />}
+        {/* 선배 매칭은 탭을 옮겨도 선택한 학생·비교 기준이 유지되도록 화면을 숨기기만 함 */}
+        <div className={tab === "match" ? "" : "hidden"}>
+          <MatchTab allUnivs={allUnivs} data={matchData} onSave={saveMatch} selId={consultId} setSelId={setConsultId}
+            onGoUniv={(id) => { matchScrollRef.current = window.scrollY; setSel(id); setTab("univ"); window.scrollTo(0, 0); }} />
+        </div>
         {tab === "manage" && <DataManager univs={allUnivs} edits={edits} onSave={saveEdits} onReset={resetEdits} onExport={exportAll} onImport={importAll} />}
       </main>
       <footer className="max-w-6xl mx-auto px-4 pb-8">
