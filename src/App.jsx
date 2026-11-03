@@ -1972,12 +1972,14 @@ function M_parseGrad(XLSX, wb) {
       type: "정시", pass: String(r[10] || "").trim() === "합" });
   });
 
+  // 교내 순위는 내신이 있는 졸업생 전원 기준(재학생과 같은 방식), 매칭 대상은 지원 기록이 있는 선배만
+  const all = Object.values(g).map((x) => ({ id: x.id, tr: x.tr, nae: x.nae, mock: M_mean(x.mocks), eng: M_mean(x.engs) }));
+  M_addTop(all);
   const withRes = new Set(results.map((x) => x.g));
-  const grads = Object.values(g)
-    .filter((x) => withRes.has(x.id))
-    .map((x) => ({ id: x.id, tr: x.tr, nae: x.nae, mock: M_mean(x.mocks), eng: M_mean(x.engs) }));
-  M_addTop(grads);
-  return { grads, results };
+  const grads = all.filter((x) => withRes.has(x.id));
+  const scale = all.filter((x) => Number.isFinite(x.top) && Number.isFinite(x.nae))
+    .sort((a, b) => a.top - b.top).map((x) => [Math.round(x.top * 10) / 10, Math.round(x.nae * 100) / 100]);
+  return { grads, results, scale };
 }
 
 /* 재학생 파일 (현재 2학년) */
@@ -2098,6 +2100,21 @@ function M_summarize(neighbors, results) {
   return { univs, passBy, anySusi, anyJeong };
 }
 
+/* 교내 상위 %에 해당하는 졸업생 9등급제 평균 (scale: [상위%, 평균등급] 오름차순, 직선 보간) */
+function M_equiv9(top, scale) {
+  if (!Number.isFinite(top) || !scale || !scale.length) return NaN;
+  if (top <= scale[0][0]) return scale[0][1];
+  const last = scale[scale.length - 1];
+  if (top >= last[0]) return last[1];
+  for (let i = 1; i < scale.length; i++) {
+    if (top <= scale[i][0]) {
+      const [t0, n0] = scale[i - 1], [t1, n1] = scale[i];
+      return t1 === t0 ? n1 : n0 + (top - t0) / (t1 - t0) * (n1 - n0);
+    }
+  }
+  return NaN;
+}
+
 /* 대학명 → 앱 대학 id (본교만 연결) */
 const M_LINK = [
   [/^서울대학교$/, "snu"], [/^고려대학교$/, "korea"], [/^연세대학교$/, "yonsei"], [/^서강대학교$/, "sogang"],
@@ -2209,6 +2226,7 @@ function MatchTab({ allUnivs, onGoUniv }) {
   const summ = useMemo(() => ((match && data.grad) ? M_summarize(match.list, data.grad.results) : null), [match, data.grad]);
   const univIds = new Set(allUnivs.map((u) => u.id));
   const linkOf = (name) => { const id = M_linkId(name); return id && univIds.has(id) ? id : null; };
+  const eq9 = st && data.grad ? M_equiv9(st.top, data.grad.scale) : NaN;
   const stLabel = st ? `2학년 ${st.ban}반 ${st.no}번${!masked && st.name ? " " + st.name : ""}` : "";
   const ready = data.grad && data.cur;
 
@@ -2302,6 +2320,7 @@ function MatchTab({ allUnivs, onGoUniv }) {
                   <p className="text-xs text-blue-700 font-bold">내신 (2학년 1학기까지)</p>
                   <p className="text-lg font-extrabold text-slate-900">{fmtTop(st.top)}</p>
                   <p className="text-xs text-slate-500">평균 {Number.isFinite(st.nae) ? st.nae.toFixed(2) : "—"}등급 (5등급제)</p>
+                  {Number.isFinite(eq9) && <p className="text-xs text-blue-800 font-bold mt-0.5">졸업생 기준 9등급제 약 {eq9.toFixed(1)}등급</p>}
                 </div>
                 <div className="rounded-lg bg-amber-50 ring-1 ring-amber-200 px-3 py-2.5">
                   <p className="text-xs text-amber-700 font-bold">모의고사 국·수·탐 백분위</p>
@@ -2457,7 +2476,7 @@ function MatchTab({ allUnivs, onGoUniv }) {
 
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 계산 방법 — 내신: 졸업생(9등급제)과 재학생(5등급제)의 등급제가 달라, 같은 학년 안에서의 석차 백분율(상위 %)로 비교합니다.
-                졸업생은 1학년 1·2학기와 2학년 1학기 평균, 재학생은 같은 세 학기를 이수단위로 가중 평균했습니다.
+                졸업생은 1학년 1·2학기와 2학년 1학기 평균, 재학생은 같은 세 학기를 이수단위로 가중 평균했습니다. '9등급제 약 ○등급'은 같은 교내 상위 %였던 졸업생들의 평균등급으로, 공식 환산 기준이 아닌 참고값입니다.
                 모의고사: 2학년 3월·9월의 국어·수학·탐구(2과목 평균) 백분위를 평균했습니다. 비슷한 정도는 두 값의 차이를 합쳐 계산하며, 선배들의 3학년 성적 변화는 반영되지 않습니다.
               </p>
             </>
